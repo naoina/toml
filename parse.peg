@@ -1,0 +1,111 @@
+package toml
+
+type tomlParser Peg {
+    toml
+}
+
+TOML <- Expression (newline Expression)* newline? !.
+
+Expression <- (
+    ws table ws comment?
+  / ws keyval ws comment?
+  / ws comment?
+  / ws
+)
+
+newline <- <[\r\n]+> { p.AddLineCount(end - begin) }
+
+ws <- [ \t]*
+wsnl <- (
+    [ \t]
+  / <[\r\n]> { p.AddLineCount(end - begin) }
+)*
+
+comment <- '#' <[\t -\0x10FFFF]*>
+
+keyval <- key ws '=' ws val { p.AddKeyValue() }
+
+key <- <[0-9A-Za-z\-_]+> { p.SetKey(buffer[begin:end]) }
+
+val <- (
+    <datetime> { p.SetTime(buffer[begin:end]) }
+  / <float>    { p.SetFloat64(buffer[begin:end]) }
+  / <integer>  { p.SetInt64(buffer[begin:end]) }
+  / string     { p.SetString() }
+  / <boolean>  { p.SetBool(buffer[begin:end]) }
+  / array
+)
+
+table <- stdTable / arrayTable
+
+stdTable <- '[' ws <tableKey> ws ']' { p.SetTable(buffer[begin:end]) }
+
+arrayTable <- '[[' ws <tableKey> ws ']]' { p.SetArrayTable(buffer[begin:end]) }
+
+tableKey <- key (tableKeySep key)*
+
+tableKeySep <- ws '.' ws
+
+integer <- '-'? int
+int <- '0' / [1-9] digit*
+
+float <- '-'? int frac exp?
+frac <- '.' digit+
+exp <- [eE] [\-+]? digit+
+
+string <- (
+    mlLiteralString
+  / literalString
+  / mlBasicString
+  / basicString
+)
+
+basicString <- <'"' basicChar* '"'> { p.SetBasicString(p.RuneSlice(buffer, begin, end)) }
+
+basicChar <- basicUnescaped / escaped
+escaped <- escape ([btnfr"/\\] / 'u' hexQuad / 'U' hexQuad hexQuad)
+
+basicUnescaped <- [ -!#-\[\]-\0x10FFFF]
+
+escape <- '\\'
+
+mlBasicString <- '"""' mlBasicBody '"""' { p.SetMultilineString() }
+
+mlBasicBody <- (
+    <basicChar / newline> { p.AddMultilineBasicBody(p.RuneSlice(buffer, begin, end)) }
+  / escape newline wsnl
+)*
+
+literalString <- "'" <literalChar*> "'" { p.SetLiteralString(p.RuneSlice(buffer, begin, end)) }
+
+literalChar <- [\t -&(-\0x10FFFF]
+
+mlLiteralString <- "'''" <mlLiteralBody> "'''" { p.SetMultilineLiteralString(p.RuneSlice(buffer, begin, end)) }
+
+mlLiteralBody <- (!"'''" (mlLiteralChar / newline))*
+
+mlLiteralChar <- [\t -\0x10FFFF]
+
+hexdigit <- [0-9A-Fa-f]
+hexQuad <- hexdigit hexdigit hexdigit hexdigit
+
+boolean <- 'true' / 'false'
+
+datetime <- digitQuad '-' digitDual '-' digitDual 'T' digitDual ':' digitDual ':' digitDual 'Z'
+
+digit <- [0-9]
+digitDual <- digit digit
+digitQuad <- digitDual digitDual
+
+array <- (
+    '[' { p.StartArray() }
+    wsnl arrayValues wsnl
+    ']' { p.EndArray() }
+)
+
+arrayValues <- (
+    val { p.AddArrayVal() }
+    arraySep? (comment? newline)?
+)*
+
+arraySep <- ws ',' wsnl
