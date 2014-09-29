@@ -6,7 +6,6 @@ go:
 
 install:
   - go get -v ./...
-  - go get -v github.com/pointlander/peg
 
 script:
-  - make test
+  - go test ./...
