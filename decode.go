@@ -104,11 +104,11 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 		switch v := val.(type) {
 		case *keyValue:
 			if err := d.setValue(fv, v.value); err != nil {
-				return fmt.Errorf("`%T.%s': %v", t, fieldName, err)
+				return fmt.Errorf("line %d: `%T.%s': %v", v.line, t, fieldName, err)
 			}
 		case *table:
 			if fv.Kind() != reflect.Struct {
-				return fmt.Errorf("`%T.%s' must be struct type, but `%T' given", t, fieldName, v)
+				return fmt.Errorf("line %d: `%T.%s' must be struct type, but `%T' given", v.line, t, fieldName, v)
 			}
 			vv := reflect.New(fv.Type())
 			if err := d.unmarshal(v, vv.Interface()); err != nil {
@@ -117,7 +117,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 			fv.Set(vv.Elem())
 		case []*table:
 			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("`%T.%s' must be slice type, but `%T' given", t, fieldName, v)
+				return fmt.Errorf("`line %d: %T.%s' must be slice type, but `%T' given", v[0].line, t, fieldName, v)
 			}
 			for _, tbl := range v {
 				vv := reflect.New(fv.Type().Elem())
