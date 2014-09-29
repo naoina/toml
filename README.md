@@ -108,7 +108,224 @@ func main() {
 }
 ```
 
-## Documentation
+## Mappings
+
+A key and value of TOML will map to the corresponding field.
+The fields of struct for mapping must be exported.
+
+The rules of the mapping of key are following:
+
+#### Exact matching
+
+```toml
+timeout_seconds = 256
+```
+
+```go
+type Config struct {
+	Timeout_seconds int
+}
+```
+
+#### Camelcase matching
+
+```toml
+server_name = "srv1"
+```
+
+```go
+type Config struct {
+	ServerName string
+}
+```
+
+#### Uppercase matching
+
+```toml
+ip = "10.0.0.1"
+```
+
+```go
+type Config struct {
+	IP string
+}
+```
+
+See the following examples for the value mappings.
+
+### String
+
+```toml
+val = "string"
+```
+
+```go
+type Config struct {
+	Val string
+}
+```
+
+### Integer
+
+```toml
+val = 100
+```
+
+```go
+type Config struct {
+	Val int
+}
+```
+
+All types that can be used are following:
+
+* int8 (from `-128` to `127`)
+* int16 (from `-32768` to `32767`)
+* int32 (from `-2147483648` to `2147483647`)
+* int64 (from `-9223372036854775808` to `9223372036854775807`)
+* int (same as `int32` on 32bit environment, or `int64` on 64bit environment)
+* uint8 (from `0` to `255`)
+* uint16 (from `0` to `65535`)
+* uint32 (from `0` to `4294967295`)
+* uint64 (from `0` to `18446744073709551615`)
+* uint (same as `uint` on 32bit environment, or `uint64` on 64bit environment)
+
+### Float
+
+```toml
+val = 3.1415
+```
+
+```go
+type Config struct {
+	Val float32
+}
+```
+
+All types that can be used are following:
+
+* float32
+* float64
+
+### Boolean
+
+```toml
+val = true
+```
+
+```go
+type Config struct {
+	Val bool
+}
+```
+
+### Datetime
+
+```toml
+val = 2014-09-28T21:27:39Z
+```
+
+```go
+type Config struct {
+	Val time.Time
+}
+```
+
+### Array
+
+```toml
+val = ["a", "b", "c"]
+```
+
+```go
+type Config struct {
+	Val []string
+}
+```
+
+Also following examples all can be mapped:
+
+```toml
+val1 = [1, 2, 3]
+val2 = [["a", "b"], ["c", "d"]]
+val3 = [[1, 2, 3], ["a", "b", "c"]]
+val4 = [[1, 2, 3], [["a", "b"], [true, false]]]
+```
+
+```go
+type Config struct {
+	Val1 []int
+	Val2 [][]string
+	Val3 [][]interface{}
+	Val4 [][]interface{}
+}
+```
+
+### Table
+
+```toml
+[server]
+type = "app"
+
+  [server.development]
+  ip = "10.0.0.1"
+
+  [server.production]
+  ip = "10.0.0.2"
+```
+
+```go
+type Config struct {
+	Server struct {
+		Development Server
+		Production Server
+	}
+}
+
+type Server struct {
+	IP string
+}
+```
+
+### Array of Tables
+
+```toml
+[[fruit]]
+  name = "apple"
+
+  [fruit.physical]
+    color = "red"
+    shape = "round"
+
+  [[fruit.variety]]
+    name = "red delicious"
+
+  [[fruit.variety]]
+    name = "granny smith"
+
+[[fruit]]
+  name = "banana"
+
+  [[fruit.variety]]
+    name = "plantain"
+```
+
+```go
+type Config struct {
+	Fruit []struct {
+		Name string
+		Physical struct {
+			Color string
+			Shape string
+		}
+		Variety []struct {
+			Name string
+		}
+	}
+}
+```
+
+## API documentation
 
 See [Godoc](http://godoc.org/github.com/naoina/toml).
 
