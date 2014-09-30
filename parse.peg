@@ -28,12 +28,12 @@ keyval <- key ws '=' ws val { p.AddKeyValue() }
 key <- <[0-9A-Za-z\-_]+> { p.SetKey(buffer[begin:end]) }
 
 val <- (
-    <datetime> { p.SetTime(buffer[begin:end]) }
-  / <float>    { p.SetFloat64(buffer[begin:end]) }
-  / <integer>  { p.SetInt64(buffer[begin:end]) }
-  / string     { p.SetString() }
-  / <boolean>  { p.SetBool(buffer[begin:end]) }
-  / array
+    <datetime> { p.SetTime(begin, end) }
+  / <float>    { p.SetFloat64(begin, end) }
+  / <integer>  { p.SetInt64(begin, end) }
+  / <string>   { p.SetString(begin, end) }
+  / <boolean>  { p.SetBool(begin, end) }
+  / <array>    { p.SetArray(begin, end) }
 )
 
 table <- stdTable / arrayTable
@@ -100,7 +100,7 @@ digitQuad <- digitDual digitDual
 array <- (
     '[' { p.StartArray() }
     wsnl arrayValues wsnl
-    ']' { p.EndArray() }
+    ']'
 )
 
 arrayValues <- (

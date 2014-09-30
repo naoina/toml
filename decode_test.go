@@ -210,9 +210,9 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = -2147483648`, nil, &testStruct{}, &testStruct{-2147483648}},
 		{`intval = -2147483649`, nil, &testStruct{}, &testStruct{-2147483649}},
 		{`intval = 9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
-		{`intval = 9223372036854775808`, fmt.Errorf(`toml: line 1: strconv.ParseInt: parsing "9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = 9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = -9223372036854775808`, nil, &testStruct{}, &testStruct{-9223372036854775808}},
-		{`intval = -9223372036854775809`, fmt.Errorf(`toml: line 1: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = -9223372036854775809`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
 	})
 }
 
@@ -334,7 +334,7 @@ func TestUnmarshal_WithArray(t *testing.T) {
 					[]interface{}{5, 6},
 				},
 			}},
-		{`arrayval = [ 1, 2.0 ] # note: this is NOT ok`, fmt.Errorf("toml: line 1: array cannot contain multiple types"), &struct{ Arrayval []interface{} }{}, &struct{ Arrayval []interface{} }{}},
+		{`arrayval = [ 1, 2.0 ] # note: this is NOT ok`, fmt.Errorf("toml: unmarshal: line 1: struct { Arrayval []interface {} }.Arrayval: array cannot contain multiple types"), &struct{ Arrayval []interface{} }{}, &struct{ Arrayval []interface{} }{}},
 		{`key = [
   1, 2, 3
 ]`, nil, &struct{ Key []int }{},

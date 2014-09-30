@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/naoina/toml/ast"
 )
 
 const (
@@ -104,11 +106,11 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 		switch v := val.(type) {
 		case *keyValue:
 			if err := d.setValue(fv, v.value); err != nil {
-				return fmt.Errorf("line %d: `%T.%s': %v", v.line, t, fieldName, err)
+				return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
 			}
 		case *table:
 			if fv.Kind() != reflect.Struct {
-				return fmt.Errorf("line %d: `%T.%s' must be struct type, but `%T' given", v.line, t, fieldName, v)
+				return fmt.Errorf("line %d: `%v.%s' must be struct type, but `%v' given", v.line, rv.Type(), fieldName, fv.Type())
 			}
 			vv := reflect.New(fv.Type())
 			if err := d.unmarshal(v, vv.Interface()); err != nil {
@@ -117,7 +119,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 			fv.Set(vv.Elem())
 		case []*table:
 			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("`line %d: %T.%s' must be slice type, but `%T' given", v[0].line, t, fieldName, v)
+				return fmt.Errorf("line %d: `%v.%s' must be slice type, but `%v' given", v[0].line, rv.Type(), fieldName, fv.Type())
 			}
 			for _, tbl := range v {
 				vv := reflect.New(fv.Type().Elem())
@@ -133,93 +135,151 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 	return nil
 }
 
-func (d *decodeState) setValue(fv reflect.Value, v interface{}) error {
-	switch lhs, rhs := fv, reflect.ValueOf(v); rhs.Kind() {
-	case reflect.Int64:
-		if err := d.setInt(lhs, rhs.Interface().(int64)); err != nil {
+func (d *decodeState) setValue(lhs reflect.Value, val ast.Value) error {
+	switch v := val.(type) {
+	case *ast.Integer:
+		if err := d.setInt(lhs, v); err != nil {
 			return err
 		}
-	case reflect.Float64:
-		if err := d.setFloat(lhs, rhs.Interface().(float64)); err != nil {
+	case *ast.Float:
+		if err := d.setFloat(lhs, v); err != nil {
 			return err
 		}
-	case reflect.Slice: // array type in toml.
-		sliceType := lhs.Type()
-		if lhs.Kind() == reflect.Interface {
-			sliceType = reflect.SliceOf(sliceType)
+	case *ast.String:
+		if err := d.setString(lhs, v); err != nil {
+			return err
 		}
-		slice := reflect.MakeSlice(sliceType, 0, rhs.Len())
-		t := sliceType.Elem()
-		for i := 0; i < rhs.Len(); i++ {
-			v := reflect.New(t).Elem()
-			if err := d.setValue(v, rhs.Index(i).Interface()); err != nil {
-				return err
-			}
-			slice = reflect.Append(slice, v)
+	case *ast.Boolean:
+		if err := d.setBoolean(lhs, v); err != nil {
+			return err
 		}
-		lhs.Set(slice)
-	case reflect.Invalid:
-		// ignore.
-	default:
-		if !rhs.Type().AssignableTo(lhs.Type()) {
-			return fmt.Errorf("`%v' type is not assignable to `%v' type", rhs.Type(), lhs.Type())
+	case *ast.Datetime:
+		if err := d.setDatetime(lhs, v); err != nil {
+			return err
 		}
-		lhs.Set(rhs)
+	case *ast.Array:
+		if err := d.setArray(lhs, v); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (d *decodeState) setInt(fv reflect.Value, v int64) error {
+func (d *decodeState) setInt(fv reflect.Value, v *ast.Integer) error {
+	i, err := strconv.ParseInt(v.Value, 10, 64)
+	if err != nil {
+		return err
+	}
 	switch fv.Kind() {
 	case reflect.Int:
-		if !inRange(v, int64(minInt), int64(maxInt)) {
-			return &errorOutOfRange{fv.Kind(), v}
+		if !inRange(i, int64(minInt), int64(maxInt)) {
+			return &errorOutOfRange{fv.Kind(), i}
 		}
-		fv.SetInt(v)
+		fv.SetInt(i)
 	case reflect.Int8:
-		if !inRange(v, math.MinInt8, math.MaxInt8) {
-			return &errorOutOfRange{fv.Kind(), v}
+		if !inRange(i, math.MinInt8, math.MaxInt8) {
+			return &errorOutOfRange{fv.Kind(), i}
 		}
-		fv.SetInt(v)
+		fv.SetInt(i)
 	case reflect.Int16:
-		if !inRange(v, math.MinInt16, math.MaxInt16) {
-			return &errorOutOfRange{fv.Kind(), v}
+		if !inRange(i, math.MinInt16, math.MaxInt16) {
+			return &errorOutOfRange{fv.Kind(), i}
 		}
-		fv.SetInt(v)
+		fv.SetInt(i)
 	case reflect.Int32:
-		if !inRange(v, math.MinInt32, math.MaxInt32) {
-			return &errorOutOfRange{fv.Kind(), v}
+		if !inRange(i, math.MinInt32, math.MaxInt32) {
+			return &errorOutOfRange{fv.Kind(), i}
 		}
-		fv.SetInt(v)
+		fv.SetInt(i)
 	case reflect.Int64:
-		if !inRange(v, math.MinInt64, math.MaxInt64) {
-			return &errorOutOfRange{fv.Kind(), v}
+		if !inRange(i, math.MinInt64, math.MaxInt64) {
+			return &errorOutOfRange{fv.Kind(), i}
 		}
-		fv.SetInt(v)
+		fv.SetInt(i)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		fv.SetUint(uint64(v))
+		fv.SetUint(uint64(i))
 	case reflect.Interface:
-		fv.Set(reflect.ValueOf(v))
+		fv.Set(reflect.ValueOf(i))
 	default:
 		return fmt.Errorf("`%v' is not any types of int", fv.Type())
 	}
 	return nil
 }
 
-func (d *decodeState) setFloat(fv reflect.Value, v float64) error {
+func (d *decodeState) setFloat(fv reflect.Value, v *ast.Float) error {
+	f, err := strconv.ParseFloat(v.Value, 64)
+	if err != nil {
+		return err
+	}
 	switch fv.Kind() {
 	case reflect.Float32:
-		if v < math.SmallestNonzeroFloat32 || math.MaxFloat32 < v {
-			return &errorOutOfRange{fv.Kind(), v}
+		if f < math.SmallestNonzeroFloat32 || math.MaxFloat32 < f {
+			return &errorOutOfRange{fv.Kind(), f}
 		}
-		fv.SetFloat(v)
+		fv.SetFloat(f)
 	case reflect.Float64:
-		fv.SetFloat(v)
+		fv.SetFloat(f)
 	case reflect.Interface:
-		fv.Set(reflect.ValueOf(v))
+		fv.Set(reflect.ValueOf(f))
 	default:
 		return fmt.Errorf("`%v' is not float32 or float64", fv.Type())
 	}
+	return nil
+}
+
+func (d *decodeState) setString(fv reflect.Value, v *ast.String) error {
+	return d.set(fv, v.Value)
+}
+
+func (d *decodeState) setBoolean(fv reflect.Value, v *ast.Boolean) error {
+	b, err := strconv.ParseBool(v.Value)
+	if err != nil {
+		return err
+	}
+	return d.set(fv, b)
+}
+
+func (d *decodeState) setDatetime(fv reflect.Value, v *ast.Datetime) error {
+	tm, err := time.Parse("2006-01-02T15:04:05Z", v.Value)
+	if err != nil {
+		return err
+	}
+	return d.set(fv, tm)
+}
+
+func (d *decodeState) setArray(fv reflect.Value, v *ast.Array) error {
+	if len(v.Value) == 0 {
+		return nil
+	}
+	typ := reflect.TypeOf(v.Value[0])
+	for _, vv := range v.Value[1:] {
+		if typ != reflect.TypeOf(vv) {
+			return fmt.Errorf("array cannot contain multiple types")
+		}
+	}
+	sliceType := fv.Type()
+	if fv.Kind() == reflect.Interface {
+		sliceType = reflect.SliceOf(sliceType)
+	}
+	slice := reflect.MakeSlice(sliceType, 0, len(v.Value))
+	t := sliceType.Elem()
+	for _, vv := range v.Value {
+		tmp := reflect.New(t).Elem()
+		if err := d.setValue(tmp, vv); err != nil {
+			return err
+		}
+		slice = reflect.Append(slice, tmp)
+	}
+	fv.Set(slice)
+	return nil
+}
+
+func (d *decodeState) set(fv reflect.Value, v interface{}) error {
+	rhs := reflect.ValueOf(v)
+	if !rhs.Type().AssignableTo(fv.Type()) {
+		return fmt.Errorf("`%v' type is not assignable to `%v' type", rhs.Type(), fv.Type())
+	}
+	fv.Set(rhs)
 	return nil
 }
 
@@ -229,7 +289,7 @@ type toml struct {
 	currentTable *table
 	s            string
 	key          string
-	val          interface{}
+	val          ast.Value
 	arr          *array
 	tableMap     map[string]*table
 }
@@ -247,76 +307,60 @@ func (p *toml) Error(err error) {
 	panic(convertError{fmt.Errorf("toml: line %d: %v", p.line, err)})
 }
 
-func (p *toml) SetTime(s string) {
-	tm, err := time.Parse(`2006-01-02T15:04:05Z`, s)
-	if err != nil {
-		p.Error(err)
+func (p *tomlParser) SetTime(begin, end int) {
+	p.val = &ast.Datetime{
+		Position: ast.Position{Begin: begin, End: end},
+		Value:    p.Buffer[begin:end],
 	}
-	p.val = tm
 }
 
-func (p *toml) SetFloat64(s string) {
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		p.Error(err)
+func (p *tomlParser) SetFloat64(begin, end int) {
+	p.val = &ast.Float{
+		Position: ast.Position{Begin: begin, End: end},
+		Value:    p.Buffer[begin:end],
 	}
-	p.val = f
 }
 
-func (p *toml) SetInt64(s string) {
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		p.Error(err)
+func (p *tomlParser) SetInt64(begin, end int) {
+	p.val = &ast.Integer{
+		Position: ast.Position{Begin: begin, End: end},
+		Value:    p.Buffer[begin:end],
 	}
-	p.val = i
 }
 
-func (p *toml) SetString() {
-	p.val = p.s
+func (p *tomlParser) SetString(begin, end int) {
+	p.val = &ast.String{
+		Position: ast.Position{Begin: begin, End: end},
+		Value:    p.s,
+	}
 	p.s = ""
 }
 
-func (p *toml) SetBool(s string) {
-	b, err := strconv.ParseBool(s)
-	if err != nil {
-		p.Error(err)
+func (p *tomlParser) SetBool(begin, end int) {
+	p.val = &ast.Boolean{
+		Position: ast.Position{Begin: begin, End: end},
+		Value:    p.Buffer[begin:end],
 	}
-	p.val = b
 }
 
-func (p *toml) StartArray() {
+func (p *tomlParser) StartArray() {
 	if p.arr == nil {
-		p.arr = &array{line: p.line}
+		p.arr = &array{line: p.line, current: &ast.Array{}}
 		return
 	}
-	p.arr.child = &array{parent: p.arr, line: p.line}
+	p.arr.child = &array{parent: p.arr, line: p.line, current: &ast.Array{}}
 	p.arr = p.arr.child
 }
 
-func (p *toml) AddArrayVal() {
-	rv := reflect.ValueOf(p.val)
+func (p *tomlParser) AddArrayVal() {
 	if p.arr.current == nil {
-		p.arr.current = reflect.MakeSlice(reflect.SliceOf(rv.Type()), 0, 1).Interface()
+		p.arr.current = &ast.Array{}
 	}
-	if rv.Kind() == reflect.Slice {
-		arrv := reflect.ValueOf(p.arr.current)
-		if arrv.Type().Elem() != rv.Type() {
-			slice := reflect.MakeSlice(reflect.TypeOf([]interface{}(nil)), 0, arrv.Len())
-			for i := 0; i < arrv.Len(); i++ {
-				slice = reflect.Append(slice, arrv.Index(i))
-			}
-			arrv = slice
-		}
-		p.arr.current = reflect.Append(arrv, rv).Interface()
-		return
-	}
-	if reflect.TypeOf(p.arr.current) != reflect.SliceOf(rv.Type()) {
-		p.ErrorArrayMultipleTypes()
-	}
-	p.arr.current = reflect.Append(reflect.ValueOf(p.arr.current), rv).Interface()
+	p.arr.current.Value = append(p.arr.current.Value, p.val)
 }
 
-func (p *toml) EndArray() {
+func (p *tomlParser) SetArray(begin, end int) {
+	p.arr.current.Position = ast.Position{Begin: begin, End: end}
 	p.val = p.arr.current
 	p.arr = p.arr.parent
 }
@@ -389,7 +433,11 @@ func (p *toml) AddKeyValue() {
 	if p.currentTable.fieldMap == nil {
 		p.currentTable.fieldMap = make(map[string]interface{})
 	}
-	p.currentTable.fieldMap[p.key] = &keyValue{key: p.key, value: p.val, line: p.line}
+	p.currentTable.fieldMap[p.key] = &keyValue{
+		key:   p.key,
+		value: p.val,
+		line:  p.line,
+	}
 }
 
 func (p *toml) SetBasicString(s string) {
@@ -414,10 +462,6 @@ func (p *toml) SetMultilineLiteralString(s string) {
 
 func (p *toml) RuneSlice(buf string, begin, end int) string {
 	return string([]rune(buf)[begin:end])
-}
-
-func (p *toml) ErrorArrayMultipleTypes() {
-	p.Error(fmt.Errorf("array cannot contain multiple types"))
 }
 
 func (p *toml) unquote(s string) string {
@@ -492,13 +536,13 @@ type table struct {
 
 type keyValue struct {
 	key   string
-	value interface{}
+	value ast.Value
 	line  int
 }
 
 type array struct {
 	parent  *array
 	child   *array
-	current interface{}
+	current *ast.Array
 	line    int
 }
