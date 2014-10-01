@@ -549,3 +549,48 @@ color = "gray"`, nil, &testStruct{},
   name = "granny smith"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with array table in line 5"), &testStruct{}, &testStruct{}},
 	})
 }
+
+type UnmarshalString string
+
+func (u *UnmarshalString) UnmarshalTOML(data []byte) error {
+	*u = UnmarshalString("UnmarshalString: " + string(data))
+	return nil
+}
+
+func TestUnmarshal_WithUnmarshaler(t *testing.T) {
+	type testStruct struct {
+		Title      UnmarshalString
+		MaxConn    UnmarshalString
+		Ports      UnmarshalString
+		Servers    UnmarshalString
+		Table      UnmarshalString
+		Arraytable UnmarshalString
+	}
+	data := `title = "testtitle"
+max_conn = 777
+ports = [8080, 8081, 8082]
+servers = [1, 2, 3]
+[table]
+name = "alice"
+[[arraytable]]
+name = "alice"
+[[arraytable]]
+name = "bob"
+`
+	var v testStruct
+	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+		t.Fatal(err)
+	}
+	actual := v
+	expect := testStruct{
+		Title:      `UnmarshalString: "testtitle"`,
+		MaxConn:    `UnmarshalString: 777`,
+		Ports:      `UnmarshalString: [8080, 8081, 8082]`,
+		Servers:    `UnmarshalString: [1, 2, 3]`,
+		Table:      "UnmarshalString: [table]\nname = \"alice\"",
+		Arraytable: "UnmarshalString: [[arraytable]]\nname = \"alice\"\n[[arraytable]]\nname = \"bob\"",
+	}
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, actual, expect)
+	}
+}

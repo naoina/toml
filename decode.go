@@ -52,6 +52,15 @@ func Unmarshal(data []byte, v interface{}) (err error) {
 	return nil
 }
 
+// Unmarshaler is the interface implemented by objects that can unmarshal a
+// TOML description of themselves.
+// The input can be assumed to be a valid encoding of a TOML value.
+// UnmarshalJSON must copy the TOML data if it wishes to retain the data after
+// returning.
+type Unmarshaler interface {
+	UnmarshalTOML([]byte) error
+}
+
 type decodeState struct {
 	p *tomlParser
 }
@@ -108,6 +117,12 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
 			}
 		case *table:
+			if err, ok := d.setUnmarshaler(fv, d.p.Buffer[v.begin:v.end]); ok {
+				if err != nil {
+					return err
+				}
+				continue
+			}
 			if fv.Kind() != reflect.Struct {
 				return fmt.Errorf("line %d: `%v.%s' must be struct type, but `%v' given", v.line, rv.Type(), fieldName, fv.Type())
 			}
@@ -117,6 +132,16 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 			}
 			fv.Set(vv.Elem())
 		case []*table:
+			data := make([]string, 0, len(v))
+			for _, tbl := range v {
+				data = append(data, d.p.Buffer[tbl.begin:tbl.end])
+			}
+			if err, ok := d.setUnmarshaler(fv, strings.Join(data, "\n")); ok {
+				if err != nil {
+					return err
+				}
+				continue
+			}
 			if fv.Kind() != reflect.Slice {
 				return fmt.Errorf("line %d: `%v.%s' must be slice type, but `%v' given", v[0].line, rv.Type(), fieldName, fv.Type())
 			}
@@ -134,7 +159,25 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 	return nil
 }
 
+func (d *decodeState) setUnmarshaler(lhs reflect.Value, data string) (error, bool) {
+	for lhs.Kind() == reflect.Ptr {
+		lhs.Set(reflect.New(lhs.Type().Elem()))
+		lhs = lhs.Elem()
+	}
+	if u, ok := lhs.Addr().Interface().(Unmarshaler); ok {
+		return u.UnmarshalTOML([]byte(data)), true
+	}
+	return nil, false
+}
+
 func (d *decodeState) setValue(lhs reflect.Value, val ast.Value) error {
+	for lhs.Kind() == reflect.Ptr {
+		lhs.Set(reflect.New(lhs.Type().Elem()))
+		lhs = lhs.Elem()
+	}
+	if err, ok := d.setUnmarshaler(lhs, d.p.Buffer[val.Pos():val.End()]); ok {
+		return err
+	}
 	switch v := val.(type) {
 	case *ast.Integer:
 		if err := d.setInt(lhs, v); err != nil {
@@ -355,6 +398,11 @@ func (p *toml) SetTable(name string) {
 	p.tableMap[name] = p.currentTable
 }
 
+func (p *toml) SetTableString(begin, end int) {
+	p.currentTable.begin = begin
+	p.currentTable.end = end
+}
+
 func (p *toml) SetArrayTable(name string) {
 	name = whitespaceReplacer.Replace(name)
 	if t, exists := p.tableMap[name]; exists && t.tableType == tableTypeNormal {
@@ -509,6 +557,8 @@ type table struct {
 	fieldMap  map[string]interface{}
 	line      int
 	tableType tableType
+	begin     int
+	end       int
 }
 
 type keyValue struct {
