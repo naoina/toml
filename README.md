@@ -325,6 +325,29 @@ type Config struct {
 }
 ```
 
+### Using `toml.UnmarshalTOML` interface
+
+```toml
+duration = "10s"
+```
+
+```go
+import time
+
+type Config struct {
+	Duration Duration
+}
+
+type Duration struct {
+	time.Duration
+}
+
+func (d *Duration) UnmarshalTOML(data []byte) error {
+	d.Duration, err := time.ParseDuration(string(data))
+	return err
+}
+```
+
 ## API documentation
 
 See [Godoc](http://godoc.org/github.com/naoina/toml).
