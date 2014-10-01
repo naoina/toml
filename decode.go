@@ -2,7 +2,6 @@ package toml
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -192,12 +191,10 @@ func (d *decodeState) setFloat(fv reflect.Value, v *ast.Float) error {
 		return err
 	}
 	switch fv.Kind() {
-	case reflect.Float32:
-		if f < math.SmallestNonzeroFloat32 || math.MaxFloat32 < f {
+	case reflect.Float32, reflect.Float64:
+		if fv.OverflowFloat(f) {
 			return &errorOutOfRange{fv.Kind(), f}
 		}
-		fv.SetFloat(f)
-	case reflect.Float64:
 		fv.SetFloat(f)
 	case reflect.Interface:
 		fv.Set(reflect.ValueOf(f))
