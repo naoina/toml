@@ -15,6 +15,15 @@ const (
 	dataDir = "testdata"
 )
 
+func loadTestData() ([]byte, error) {
+	f := filepath.Join(dataDir, "test.toml")
+	data, err := ioutil.ReadFile(f)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func mustTime(tm time.Time, err error) time.Time {
 	if err != nil {
 		panic(err)
@@ -55,8 +64,7 @@ func TestUnmarshal(t *testing.T) {
 		Clients  Clients
 	}
 
-	testfile := filepath.Join(dataDir, "test.toml")
-	data, err := ioutil.ReadFile(testfile)
+	data, err := loadTestData()
 	if err != nil {
 		t.Fatal(err)
 	}
