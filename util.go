@@ -57,16 +57,3 @@ func findField(rv reflect.Value, name string) (field reflect.Value, fieldName st
 	}
 	return field, "", false
 }
-
-// maximum and minimum of each integer types on the 32 or 64 bit environment.
-// See https://groups.google.com/forum/#!msg/golang-nuts/a9PitPAHSSU/ziQw1-QHw3EJ
-const (
-	maxUint = ^uint(0)
-	minUint = uint(0)
-	maxInt  = int(maxUint >> 1)
-	minInt  = -maxInt - 1
-)
-
-func inRange(v, min, max int64) bool {
-	return min <= v && v <= max
-}

@@ -171,28 +171,8 @@ func (d *decodeState) setInt(fv reflect.Value, v *ast.Integer) error {
 		return err
 	}
 	switch fv.Kind() {
-	case reflect.Int:
-		if !inRange(i, int64(minInt), int64(maxInt)) {
-			return &errorOutOfRange{fv.Kind(), i}
-		}
-		fv.SetInt(i)
-	case reflect.Int8:
-		if !inRange(i, math.MinInt8, math.MaxInt8) {
-			return &errorOutOfRange{fv.Kind(), i}
-		}
-		fv.SetInt(i)
-	case reflect.Int16:
-		if !inRange(i, math.MinInt16, math.MaxInt16) {
-			return &errorOutOfRange{fv.Kind(), i}
-		}
-		fv.SetInt(i)
-	case reflect.Int32:
-		if !inRange(i, math.MinInt32, math.MaxInt32) {
-			return &errorOutOfRange{fv.Kind(), i}
-		}
-		fv.SetInt(i)
-	case reflect.Int64:
-		if !inRange(i, math.MinInt64, math.MaxInt64) {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if fv.OverflowInt(i) {
 			return &errorOutOfRange{fv.Kind(), i}
 		}
 		fv.SetInt(i)
