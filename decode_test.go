@@ -594,3 +594,25 @@ name = "bob"
 		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, actual, expect)
 	}
 }
+
+func TestUnmarshal_WithMultibyteString(t *testing.T) {
+	type testStruct struct {
+		Name    string
+		Numbers []string
+	}
+	v := testStruct{}
+	data := `name = "七一〇七"
+numbers = ["壱", "弐", "参"]
+`
+	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+		t.Fatal(err)
+	}
+	actual := v
+	expect := testStruct{
+		Name:    "七一〇七",
+		Numbers: []string{"壱", "弐", "参"},
+	}
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf(`toml.Unmarshal([]byte(data), &v); v => %#v; want %#v`, actual, expect)
+	}
+}

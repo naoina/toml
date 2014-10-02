@@ -117,7 +117,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
 			}
 		case *table:
-			if err, ok := d.setUnmarshaler(fv, d.p.Buffer[v.begin:v.end]); ok {
+			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[v.begin:v.end])); ok {
 				if err != nil {
 					return err
 				}
@@ -134,7 +134,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 		case []*table:
 			data := make([]string, 0, len(v))
 			for _, tbl := range v {
-				data = append(data, d.p.Buffer[tbl.begin:tbl.end])
+				data = append(data, string(d.p.buffer[tbl.begin:tbl.end]))
 			}
 			if err, ok := d.setUnmarshaler(fv, strings.Join(data, "\n")); ok {
 				if err != nil {
@@ -175,7 +175,7 @@ func (d *decodeState) setValue(lhs reflect.Value, val ast.Value) error {
 		lhs.Set(reflect.New(lhs.Type().Elem()))
 		lhs = lhs.Elem()
 	}
-	if err, ok := d.setUnmarshaler(lhs, d.p.Buffer[val.Pos():val.End()]); ok {
+	if err, ok := d.setUnmarshaler(lhs, string(d.p.buffer[val.Pos():val.End()])); ok {
 		return err
 	}
 	switch v := val.(type) {
@@ -330,21 +330,21 @@ func (p *toml) Error(err error) {
 func (p *tomlParser) SetTime(begin, end int) {
 	p.val = &ast.Datetime{
 		Position: ast.Position{Begin: begin, End: end},
-		Value:    p.Buffer[begin:end],
+		Value:    string(p.buffer[begin:end]),
 	}
 }
 
 func (p *tomlParser) SetFloat64(begin, end int) {
 	p.val = &ast.Float{
 		Position: ast.Position{Begin: begin, End: end},
-		Value:    p.Buffer[begin:end],
+		Value:    string(p.buffer[begin:end]),
 	}
 }
 
 func (p *tomlParser) SetInt64(begin, end int) {
 	p.val = &ast.Integer{
 		Position: ast.Position{Begin: begin, End: end},
-		Value:    p.Buffer[begin:end],
+		Value:    string(p.buffer[begin:end]),
 	}
 }
 
@@ -359,7 +359,7 @@ func (p *tomlParser) SetString(begin, end int) {
 func (p *tomlParser) SetBool(begin, end int) {
 	p.val = &ast.Boolean{
 		Position: ast.Position{Begin: begin, End: end},
-		Value:    p.Buffer[begin:end],
+		Value:    string(p.buffer[begin:end]),
 	}
 }
 
@@ -385,8 +385,8 @@ func (p *tomlParser) SetArray(begin, end int) {
 	p.arr = p.arr.parent
 }
 
-func (p *toml) SetTable(name string) {
-	name = whitespaceReplacer.Replace(name)
+func (p *toml) SetTable(buf []rune, begin, end int) {
+	name := whitespaceReplacer.Replace(string(buf[begin:end]))
 	if t, exists := p.tableMap[name]; exists {
 		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
 	}
@@ -403,8 +403,8 @@ func (p *toml) SetTableString(begin, end int) {
 	p.currentTable.end = end
 }
 
-func (p *toml) SetArrayTable(name string) {
-	name = whitespaceReplacer.Replace(name)
+func (p *toml) SetArrayTable(buf []rune, begin, end int) {
+	name := whitespaceReplacer.Replace(string(buf[begin:end]))
 	if t, exists := p.tableMap[name]; exists && t.tableType == tableTypeNormal {
 		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
 	}
@@ -440,8 +440,8 @@ func (p *toml) AddLineCount(i int) {
 	p.line += i
 }
 
-func (p *toml) SetKey(key string) {
-	p.key = key
+func (p *toml) SetKey(buf []rune, begin, end int) {
+	p.key = string(buf[begin:end])
 }
 
 func (p *toml) AddKeyValue() {
@@ -465,28 +465,24 @@ func (p *toml) AddKeyValue() {
 	}
 }
 
-func (p *toml) SetBasicString(s string) {
-	p.s = p.unquote(s)
+func (p *toml) SetBasicString(buf []rune, begin, end int) {
+	p.s = p.unquote(string(buf[begin:end]))
 }
 
 func (p *toml) SetMultilineString() {
 	p.s = p.unquote(`"` + escapeReplacer.Replace(strings.TrimLeft(p.s, "\r\n")) + `"`)
 }
 
-func (p *toml) AddMultilineBasicBody(s string) {
-	p.s += s
+func (p *toml) AddMultilineBasicBody(buf []rune, begin, end int) {
+	p.s += string(buf[begin:end])
 }
 
-func (p *toml) SetLiteralString(s string) {
-	p.s = s
+func (p *toml) SetLiteralString(buf []rune, begin, end int) {
+	p.s = string(buf[begin:end])
 }
 
-func (p *toml) SetMultilineLiteralString(s string) {
-	p.s = strings.TrimLeft(s, "\r\n")
-}
-
-func (p *toml) RuneSlice(buf string, begin, end int) string {
-	return string([]rune(buf)[begin:end])
+func (p *toml) SetMultilineLiteralString(buf []rune, begin, end int) {
+	p.s = strings.TrimLeft(string(buf[begin:end]), "\r\n")
 }
 
 func (p *toml) unquote(s string) string {
