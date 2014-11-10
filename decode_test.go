@@ -34,8 +34,6 @@ func mustTime(tm time.Time, err error) time.Time {
 func TestUnmarshal(t *testing.T) {
 	type Owner struct {
 		Name string
-		Org  string `toml:"organization"`
-		Bio  string
 		Dob  time.Time
 	}
 	type Database struct {
@@ -79,10 +77,8 @@ func TestUnmarshal(t *testing.T) {
 	expect = testStruct{
 		Title: "TOML Example",
 		Owner: Owner{
-			Name: "Tom Preston-Werner",
-			Org:  "GitHub",
-			Bio:  "GitHub Cofounder & CEO\nLikes tater tots and beer.",
-			Dob:  mustTime(time.Parse("20060102150405", "19790527073200")),
+			Name: "Lance Uppercut",
+			Dob:  mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T07:32:00-08:00")),
 		},
 		Database: Database{
 			Server:        "192.168.1.1",
@@ -208,17 +204,22 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 	}
 	testUnmarshal(t, []testcase{
 		{`intval = 0`, nil, &testStruct{}, &testStruct{0}},
+		{`intval = +0`, nil, &testStruct{}, &testStruct{0}},
 		{`intval = -0`, nil, &testStruct{}, &testStruct{-0}},
 		{`intval = 1`, nil, &testStruct{}, &testStruct{1}},
+		{`intval = +1`, nil, &testStruct{}, &testStruct{-1}},
 		{`intval = -1`, nil, &testStruct{}, &testStruct{-1}},
 		{`intval = 10`, nil, &testStruct{}, &testStruct{10}},
 		{`intval = 777`, nil, &testStruct{}, &testStruct{777}},
 		{`intval = 2147483647`, nil, &testStruct{}, &testStruct{2147483647}},
 		{`intval = 2147483648`, nil, &testStruct{}, &testStruct{2147483648}},
+		{`intval = +2147483648`, nil, &testStruct{}, &testStruct{2147483648}},
 		{`intval = -2147483648`, nil, &testStruct{}, &testStruct{-2147483648}},
 		{`intval = -2147483649`, nil, &testStruct{}, &testStruct{-2147483649}},
 		{`intval = 9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
+		{`intval = +9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
 		{`intval = 9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = +9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "+9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = -9223372036854775808`, nil, &testStruct{}, &testStruct{-9223372036854775808}},
 		{`intval = -9223372036854775809`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
 	})
@@ -230,21 +231,33 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 	}
 	testUnmarshal(t, []testcase{
 		{`floatval = 0.0`, nil, &testStruct{}, &testStruct{0.0}},
+		{`floatval = +0.0`, nil, &testStruct{}, &testStruct{0.0}},
 		{`floatval = -0.0`, nil, &testStruct{}, &testStruct{-0.0}},
 		{`floatval = 0.1`, nil, &testStruct{}, &testStruct{0.1}},
+		{`floatval = +0.1`, nil, &testStruct{}, &testStruct{0.1}},
 		{`floatval = -0.1`, nil, &testStruct{}, &testStruct{-0.1}},
 		{`floatval = 0.2`, nil, &testStruct{}, &testStruct{0.2}},
+		{`floatval = +0.2`, nil, &testStruct{}, &testStruct{0.2}},
 		{`floatval = -0.2`, nil, &testStruct{}, &testStruct{-0.2}},
 		{`floatval = 1.0`, nil, &testStruct{}, &testStruct{1.0}},
+		{`floatval = +1.0`, nil, &testStruct{}, &testStruct{1.0}},
 		{`floatval = -1.0`, nil, &testStruct{}, &testStruct{-1.0}},
 		{`floatval = 1.1`, nil, &testStruct{}, &testStruct{1.1}},
+		{`floatval = +1.1`, nil, &testStruct{}, &testStruct{1.1}},
 		{`floatval = -1.1`, nil, &testStruct{}, &testStruct{-1.1}},
 		{`floatval = 3.1415`, nil, &testStruct{}, &testStruct{3.1415}},
+		{`floatval = +3.1415`, nil, &testStruct{}, &testStruct{3.1415}},
 		{`floatval = -3.1415`, nil, &testStruct{}, &testStruct{-3.1415}},
 		{`floatval = 10.2e5`, nil, &testStruct{}, &testStruct{10.2e5}},
+		{`floatval = +10.2e5`, nil, &testStruct{}, &testStruct{10.2e5}},
 		{`floatval = -10.2e5`, nil, &testStruct{}, &testStruct{-10.2e5}},
 		{`floatval = 10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
+		{`floatval = +10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
 		{`floatval = -10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
+		{`floatval = 5e+22`, nil, &testStruct{}, &testStruct{5e+22}},
+		{`floatval = 1e6`, nil, &testStruct{}, &testStruct{1e6}},
+		{`floatval = -2E-2`, nil, &testStruct{}, &testStruct{-2E-2}},
+		{`floatval = 6.626e-34`, nil, &testStruct{}, &testStruct{6.626e-34}},
 	})
 }
 
@@ -264,10 +277,16 @@ func TestUnmarshal_WithDatetime(t *testing.T) {
 	}
 	testUnmarshal(t, []testcase{
 		{`datetimeval = 1979-05-27T07:32:00Z`, nil, &testStruct{}, &testStruct{
-			mustTime(time.Parse("20060102150405", "19790527073200")),
+			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T07:32:00Z")),
 		}},
 		{`datetimeval = 2014-09-13T12:37:39Z`, nil, &testStruct{}, &testStruct{
-			mustTime(time.Parse("20060102150405", "20140913123739")),
+			mustTime(time.Parse(time.RFC3339Nano, "2014-09-13T12:37:39Z")),
+		}},
+		{`datetimeval = 1979-05-27T00:32:00-07:00`, nil, &testStruct{}, &testStruct{
+			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00-07:00")),
+		}},
+		{`datetimeval = 1979-05-27T00:32:00.999999-07:00`, nil, &testStruct{}, &testStruct{
+			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00.999999-07:00")),
 		}},
 	})
 }

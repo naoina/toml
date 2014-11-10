@@ -260,7 +260,7 @@ func (d *decodeState) setBoolean(fv reflect.Value, v *ast.Boolean) error {
 }
 
 func (d *decodeState) setDatetime(fv reflect.Value, v *ast.Datetime) error {
-	tm, err := time.Parse("2006-01-02T15:04:05Z", v.Value)
+	tm, err := time.Parse(time.RFC3339Nano, v.Value)
 	if err != nil {
 		return err
 	}

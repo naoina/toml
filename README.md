@@ -2,7 +2,7 @@
 
 [TOML](https://github.com/toml-lang/toml) parser library for [Golang](http://golang.org/).
 
-This library is compatible with TOML version [v0.2.0](https://github.com/toml-lang/toml/blob/master/versions/toml-v0.2.0.md).
+This library is compatible with TOML version [v0.3.0](https://github.com/toml-lang/toml/blob/master/versions/toml-v0.3.0.md).
 
 ## Installation
 
@@ -13,13 +13,13 @@ This library is compatible with TOML version [v0.2.0](https://github.com/toml-la
 The following TOML save as `example.toml`.
 
 ```toml
+# This is a TOML document. Boom.
+
 title = "TOML Example"
 
 [owner]
-name = "Tom Preston-Werner"
-organization = "GitHub"
-bio = "GitHub Cofounder & CEO\nLikes tater tots and beer."
-dob = 1979-05-27T07:32:00Z # First class dates? Why not?
+name = "Lance Uppercut"
+dob = 1979-05-27T07:32:00-08:00 # First class dates? Why not?
 
 [database]
 server = "192.168.1.1"
@@ -65,8 +65,6 @@ type tomlConfig struct {
     Title string
     Owner struct {
         Name string
-        Org  string `toml:"organization"`
-        Bio  string
         Dob  time.Time
     }
     Database struct {

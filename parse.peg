@@ -46,12 +46,12 @@ tableKey <- key (tableKeySep key)*
 
 tableKeySep <- ws '.' ws
 
-integer <- '-'? int
+integer <- [\-+]? int
 int <- '0' / [1-9] digit*
 
-float <- '-'? int frac exp?
+float <- integer (frac exp? / frac? exp)
 frac <- '.' digit+
-exp <- [eE] [\-+]? digit+
+exp <- [eE] integer
 
 string <- (
     mlLiteralString
@@ -91,7 +91,19 @@ hexQuad <- hexdigit hexdigit hexdigit hexdigit
 
 boolean <- 'true' / 'false'
 
-datetime <- digitQuad '-' digitDual '-' digitDual 'T' digitDual ':' digitDual ':' digitDual 'Z'
+dateFullYear <- digitQuad
+dateMonth <- digitDual
+dateMDay <- digitDual
+timeHour <- digitDual
+timeMinute <- digitDual
+timeSecond <- digitDual
+timeSecfrac <- '.' digit+
+timeNumoffset <- [\-+] timeHour ':' timeMinute
+timeOffset <- 'Z' / timeNumoffset
+partialTime <- timeHour ':' timeMinute ':' timeSecond timeSecfrac?
+fullDate <- dateFullYear '-' dateMonth '-' dateMDay
+fullTime <- partialTime timeOffset
+datetime <- fullDate 'T' fullTime
 
 digit <- [0-9]
 digitDual <- digit digit
