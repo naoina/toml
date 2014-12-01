@@ -2,7 +2,7 @@
 
 [TOML](https://github.com/toml-lang/toml) parser library for [Golang](http://golang.org/).
 
-This library is compatible with TOML version [v0.3.0](https://github.com/toml-lang/toml/blob/master/versions/toml-v0.3.0.md).
+This library is compatible with TOML version [v0.3.1](https://github.com/toml-lang/toml/blob/master/versions/toml-v0.3.1.md).
 
 ## Installation
 
