@@ -622,6 +622,13 @@ func TestUnmarshal_WithTable(t *testing.T) {
 			} `toml:"tater.man"`
 		}
 	}
+	type testQuotedKeyWithWhitespaceStruct struct {
+		Dog struct {
+			TaterMan struct {
+				Type string
+			} `toml:"tater . man"`
+		}
+	}
 	testUnmarshal(t, []testcase{
 		{`[table]`, nil, &testStruct{}, &testStruct{}},
 		{`[table]
@@ -648,6 +655,21 @@ type = "pug"`, nil, &testQuotedKeyStruct{},
 					TaterMan struct {
 						Type string
 					} `toml:"tater.man"`
+				}{
+					TaterMan: struct {
+						Type string
+					}{
+						Type: "pug",
+					},
+				},
+			}},
+		{`[dog."tater . man"]
+type = "pug"`, nil, &testQuotedKeyWithWhitespaceStruct{},
+			&testQuotedKeyWithWhitespaceStruct{
+				Dog: struct {
+					TaterMan struct {
+						Type string
+					} `toml:"tater . man"`
 				}{
 					TaterMan: struct {
 						Type string

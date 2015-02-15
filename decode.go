@@ -22,10 +22,6 @@ var (
 		"\r", "\\r",
 		"\t", "\\t",
 	)
-	whitespaceReplacer = strings.NewReplacer(
-		" ", "",
-		"\t", "",
-	)
 	underscoreReplacer = strings.NewReplacer(
 		"_", "",
 	)
@@ -400,7 +396,7 @@ func (p *toml) SetTable(buf []rune, begin, end int) {
 }
 
 func (p *toml) setTable(t *table, buf []rune, begin, end int) {
-	name := whitespaceReplacer.Replace(string(buf[begin:end]))
+	name := string(buf[begin:end])
 	if t, exists := p.tableMap[name]; exists {
 		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
 	}
@@ -422,7 +418,7 @@ func (p *toml) SetArrayTable(buf []rune, begin, end int) {
 }
 
 func (p *toml) setArrayTable(t *table, buf []rune, begin, end int) {
-	name := whitespaceReplacer.Replace(string(buf[begin:end]))
+	name := string(buf[begin:end])
 	if t, exists := p.tableMap[name]; exists && t.tableType == tableTypeNormal {
 		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
 	}
@@ -577,6 +573,8 @@ func splitTableKey(tk string) []string {
 			key = key[:0] // reuse buffer.
 		case k == '"':
 			inQuote = !inQuote
+		case (k == ' ' || k == '\t') && !inQuote:
+			// skip.
 		default:
 			key = append(key, k)
 		}
