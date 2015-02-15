@@ -32,34 +32,147 @@ func mustTime(tm time.Time, err error) time.Time {
 }
 
 func TestUnmarshal(t *testing.T) {
-	type Owner struct {
+	type Name struct {
+		First string
+		Last  string
+	}
+	type Point struct {
+		X int
+		Y int
+	}
+	type Inline struct {
+		Name  Name
+		Point Point
+	}
+	type Subtable struct {
+		Key string
+	}
+	type Table struct {
+		Key      string
+		Subtable Subtable
+		Inline   Inline
+	}
+	type W struct {
+	}
+	type Z struct {
+		W W
+	}
+	type Y struct {
+		Z Z
+	}
+	type X struct {
+		Y Y
+	}
+	type Basic struct {
+		Basic string
+	}
+	type Continued struct {
+		Key1 string
+		Key2 string
+		Key3 string
+	}
+	type Multiline struct {
+		Key1      string
+		Key2      string
+		Key3      string
+		Continued Continued
+	}
+	type LiteralMultiline struct {
+		Regex2 string
+		Lines  string
+	}
+	type Literal struct {
+		Winpath   string
+		Winpath2  string
+		Quoted    string
+		Regex     string
+		Multiline LiteralMultiline
+	}
+	type String struct {
+		Basic     Basic
+		Multiline Multiline
+		Literal   Literal
+	}
+	type IntegerUnderscores struct {
+		Key1 int
+		Key2 int
+		Key3 int
+	}
+	type Integer struct {
+		Key1        int
+		Key2        int
+		Key3        int
+		Key4        int
+		Underscores IntegerUnderscores
+	}
+	type Fractional struct {
+		Key1 float64
+		Key2 float64
+		Key3 float64
+	}
+	type Exponent struct {
+		Key1 float64
+		Key2 float64
+		Key3 float64
+	}
+	type Both struct {
+		Key float64
+	}
+	type FloatUnderscores struct {
+		Key1 float64
+		Key2 float64
+	}
+	type Float struct {
+		Fractional  Fractional
+		Exponent    Exponent
+		Both        Both
+		Underscores FloatUnderscores
+	}
+	type Boolean struct {
+		True  bool
+		False bool
+	}
+	type Datetime struct {
+		Key1 time.Time
+		Key2 time.Time
+		Key3 time.Time
+	}
+	type Array struct {
+		Key1 []int
+		Key2 []string
+		Key3 [][]int
+		Key4 [][]interface{}
+		Key5 []int
+		Key6 []int
+	}
+	type Product struct {
+		Name  string
+		Sku   int64
+		Color string
+	}
+	type Physical struct {
+		Color string
+		Shape string
+	}
+	type Variety struct {
 		Name string
-		Dob  time.Time
 	}
-	type Database struct {
-		Server        string
-		Ports         []int
-		ConnectionMax uint
-		Enabled       bool
-	}
-	type Server struct {
-		IP string
-		DC string
-	}
-	type Servers struct {
-		Alpha Server
-		Beta  Server
-	}
-	type Clients struct {
-		Data  [][]interface{}
-		Hosts []string
+	type Fruit struct {
+		Name     string
+		Physical Physical
+		Variety  []Variety
 	}
 	type testStruct struct {
-		Title    string
-		Owner    Owner
-		Database Database
-		Servers  Servers
-		Clients  Clients
+		Table    Table
+		X        X
+		String   String
+		Integer  Integer
+		Float    Float
+		Boolean  Boolean
+		Datetime Datetime
+		Array    Array
+		Products []Product
+		Fruit    []Fruit
 	}
 
 	data, err := loadTestData()
@@ -75,33 +188,118 @@ func TestUnmarshal(t *testing.T) {
 
 	actual = v
 	expect = testStruct{
-		Title: "TOML Example",
-		Owner: Owner{
-			Name: "Lance Uppercut",
-			Dob:  mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T07:32:00-08:00")),
-		},
-		Database: Database{
-			Server:        "192.168.1.1",
-			Ports:         []int{8001, 8001, 8002},
-			ConnectionMax: 5000,
-			Enabled:       true,
-		},
-		Servers: Servers{
-			Alpha: Server{
-				IP: "10.0.0.1",
-				DC: "eqdc10",
+		Table: Table{
+			Key: "value",
+			Subtable: Subtable{
+				Key: "another value",
 			},
-			Beta: Server{
-				IP: "10.0.0.2",
-				DC: "eqdc10",
+			Inline: Inline{
+				Name: Name{
+					First: "Tom",
+					Last:  "Preston-Werner",
+				},
+				Point: Point{
+					X: 1,
+					Y: 2,
+				},
 			},
 		},
-		Clients: Clients{
-			Data: [][]interface{}{
-				[]interface{}{"gamma", "delta"},
-				[]interface{}{int64(1), int64(2)},
+		X: X{},
+		String: String{
+			Basic: Basic{
+				Basic: "I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF.",
 			},
-			Hosts: []string{"alpha", "omega"},
+			Multiline: Multiline{
+				Key1: "One\nTwo",
+				Key2: "One\nTwo",
+				Key3: "One\nTwo",
+				Continued: Continued{
+					Key1: "The quick brown fox jumps over the lazy dog.",
+					Key2: "The quick brown fox jumps over the lazy dog.",
+					Key3: "The quick brown fox jumps over the lazy dog.",
+				},
+			},
+			Literal: Literal{
+				Winpath:  `C:\Users\nodejs\templates`,
+				Winpath2: `\\ServerX\admin$\system32\`,
+				Quoted:   `Tom "Dubs" Preston-Werner`,
+				Regex:    `<\i\c*\s*>`,
+				Multiline: LiteralMultiline{
+					Regex2: `I [dw]on't need \d{2} apples`,
+					Lines:  "The first newline is\ntrimmed in raw strings.\n   All other whitespace\n   is preserved.\n",
+				},
+			},
+		},
+		Integer: Integer{
+			Key1: 99,
+			Key2: 42,
+			Key3: 0,
+			Key4: -17,
+			Underscores: IntegerUnderscores{
+				Key1: 1000,
+				Key2: 5349221,
+				Key3: 12345,
+			},
+		},
+		Float: Float{
+			Fractional: Fractional{
+				Key1: 1.0,
+				Key2: 3.1415,
+				Key3: -0.01,
+			},
+			Exponent: Exponent{
+				Key1: 5e22,
+				Key2: 1e6,
+				Key3: -2e-2,
+			},
+			Both: Both{
+				Key: 6.626e-34,
+			},
+			Underscores: FloatUnderscores{
+				Key1: 9224617.445991228313,
+				Key2: 1e100,
+			},
+		},
+		Boolean: Boolean{
+			True:  true,
+			False: false,
+		},
+		Datetime: Datetime{
+			Key1: mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T07:32:00Z")),
+			Key2: mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00-07:00")),
+			Key3: mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00.999999-07:00")),
+		},
+		Array: Array{
+			Key1: []int{1, 2, 3},
+			Key2: []string{"red", "yellow", "green"},
+			Key3: [][]int{{1, 2}, {3, 4, 5}},
+			Key4: [][]interface{}{{int64(1), int64(2)}, {"a", "b", "c"}},
+			Key5: []int{1, 2, 3},
+			Key6: []int{1, 2},
+		},
+		Products: []Product{
+			{Name: "Hammer", Sku: 738594937},
+			{},
+			{Name: "Nail", Sku: 284758393, Color: "gray"},
+		},
+		Fruit: []Fruit{
+			{
+				Name: "apple",
+				Physical: Physical{
+					Color: "red",
+					Shape: "round",
+				},
+				Variety: []Variety{
+					{Name: "red delicious"},
+					{Name: "granny smith"},
+				},
+			},
+			{
+				Name: "banana",
+				Variety: []Variety{
+					{Name: "plantain"},
+				},
+			},
 		},
 	}
 	if !reflect.DeepEqual(actual, expect) {
@@ -222,6 +420,11 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = +9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "+9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = -9223372036854775808`, nil, &testStruct{}, &testStruct{-9223372036854775808}},
 		{`intval = -9223372036854775809`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = 1_000`, nil, &testStruct{}, &testStruct{1000}},
+		{`intval = 5_349_221`, nil, &testStruct{}, &testStruct{5349221}},
+		{`intval = 1_2_3_4_5`, nil, &testStruct{}, &testStruct{12345}},
+		{`intval = _1_000`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
+		{`intval = 1_000_`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
 	})
 }
 
@@ -258,6 +461,10 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = 1e6`, nil, &testStruct{}, &testStruct{1e6}},
 		{`floatval = -2E-2`, nil, &testStruct{}, &testStruct{-2E-2}},
 		{`floatval = 6.626e-34`, nil, &testStruct{}, &testStruct{6.626e-34}},
+		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{}, &testStruct{9224617.445991228313}},
+		{`floatval = 1e1_00`, nil, &testStruct{}, &testStruct{1e100}},
+		{`floatval = _1e1_00`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
+		{`floatval = 1e1_00_`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
 	})
 }
 
@@ -315,6 +522,10 @@ func TestUnmarshal_WithArray(t *testing.T) {
 		{`arrayval = ["red", "yellow", "green"]`, nil, &struct{ Arrayval []string }{},
 			&struct{ Arrayval []string }{
 				[]string{"red", "yellow", "green"},
+			}},
+		{`arrayval = [ "all", 'strings', """are the same""", '''type''']`, nil, &struct{ Arrayval []string }{},
+			&struct{ Arrayval []string }{
+				[]string{"all", "strings", "are the same", "type"},
 			}},
 		{`arrayval = [[1,2],[3,4,5]]`, nil, &struct{ Arrayval [][]int }{},
 			&struct{ Arrayval [][]int }{
@@ -404,6 +615,13 @@ func TestUnmarshal_WithTable(t *testing.T) {
 			}
 		}
 	}
+	type testQuotedKeyStruct struct {
+		Dog struct {
+			TaterMan struct {
+				Type string
+			} `toml:"tater.man"`
+		}
+	}
 	testUnmarshal(t, []testcase{
 		{`[table]`, nil, &testStruct{}, &testStruct{}},
 		{`[table]
@@ -423,10 +641,42 @@ key = "value"`, nil, &testStruct{},
 					Tater: struct{}{},
 				},
 			}},
+		{`[dog."tater.man"]
+type = "pug"`, nil, &testQuotedKeyStruct{},
+			&testQuotedKeyStruct{
+				Dog: struct {
+					TaterMan struct {
+						Type string
+					} `toml:"tater.man"`
+				}{
+					TaterMan: struct {
+						Type string
+					}{
+						Type: "pug",
+					},
+				},
+			}},
 		{`[x.y.z.w] # for this to work`, nil, &testStruct{},
 			&testStruct{
 				X: X{},
 			}},
+		{`[ x .  y  . z . w ]`, nil, &testStruct{},
+			&testStruct{
+				X: X{},
+			}},
+		{`[ x . "y" . z . "w" ]`, nil, &testStruct{},
+			&testStruct{
+				X: X{},
+			}},
+		{`table = {}`, nil, &testStruct{}, &testStruct{}},
+		{`table = { key = "value" }`, nil, &testStruct{}, &testStruct{
+			Table: struct {
+				Key string
+			}{
+				Key: "value",
+			},
+		}},
+		{`x = { y = { "z" = { w = {} } } }`, nil, &testStruct{}, &testStruct{X: X{}}},
 		{`[a.b]
 c = 1
 
@@ -501,15 +751,15 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 	}
 	testUnmarshal(t, []testcase{
 		{`[[products]]
-name = "Hammer"
-sku = 738594937
+		name = "Hammer"
+		sku = 738594937
 
-[[products]]
+		[[products]]
 
-[[products]]
-name = "Nail"
-sku = 284758393
-color = "gray"`, nil, &testStruct{},
+		[[products]]
+		name = "Nail"
+		sku = 284758393
+		color = "gray"`, nil, &testStruct{},
 			&testStruct{
 				Products: []Product{
 					{Name: "Hammer", SKU: 738594937},
@@ -517,24 +767,32 @@ color = "gray"`, nil, &testStruct{},
 					{Name: "Nail", SKU: 284758393, Color: "gray"},
 				},
 			}},
+		{`products = [{name = "Hammer", sku = 738594937}, {},
+{name = "Nail", sku = 284758393, color = "gray"}]`, nil, &testStruct{}, &testStruct{
+			Products: []Product{
+				{Name: "Hammer", SKU: 738594937},
+				{},
+				{Name: "Nail", SKU: 284758393, Color: "gray"},
+			},
+		}},
 		{`[[fruit]]
-  name = "apple"
+		name = "apple"
 
-  [fruit.physical]
-    color = "red"
-    shape = "round"
+		[fruit.physical]
+		color = "red"
+		shape = "round"
 
-  [[fruit.variety]]
-    name = "red delicious"
+		[[fruit.variety]]
+		name = "red delicious"
 
-  [[fruit.variety]]
-    name = "granny smith"
+		[[fruit.variety]]
+		name = "granny smith"
 
-[[fruit]]
-  name = "banana"
+		[[fruit]]
+		name = "banana"
 
-  [[fruit.variety]]
-    name = "plantain"`, nil, &testStruct{},
+		[[fruit.variety]]
+		name = "plantain"`, nil, &testStruct{},
 			&testStruct{
 				Fruit: []Fruit{
 					{
@@ -557,15 +815,15 @@ color = "gray"`, nil, &testStruct{},
 				},
 			}},
 		{`# INVALID TOML DOC
-[[fruit]]
-  name = "apple"
+		[[fruit]]
+		name = "apple"
 
-  [[fruit.variety]]
-    name = "red delicious"
+		[[fruit.variety]]
+		name = "red delicious"
 
-  # This table conflicts with the previous table
-  [fruit.variety]
-  name = "granny smith"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with array table in line 5"), &testStruct{}, &testStruct{}},
+		# This table conflicts with the previous table
+		[fruit.variety]
+		name = "granny smith"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with array table in line 5"), &testStruct{}, &testStruct{}},
 	})
 }
 

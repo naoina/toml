@@ -25,15 +25,20 @@ comment <- '#' <[\t -\0x10FFFF]*>
 
 keyval <- key ws '=' ws val { p.AddKeyValue() }
 
-key <- <[0-9A-Za-z\-_]+> { p.SetKey(p.buffer, begin, end) }
+key <- bareKey / quotedKey
+
+bareKey <- <[0-9A-Za-z\-_]+> { p.SetKey(p.buffer, begin, end) }
+
+quotedKey <- '"' <basicChar+> '"' { p.SetKey(p.buffer, begin, end) }
 
 val <- (
-    <datetime> { p.SetTime(begin, end) }
-  / <float>    { p.SetFloat64(begin, end) }
-  / <integer>  { p.SetInt64(begin, end) }
-  / <string>   { p.SetString(begin, end) }
-  / <boolean>  { p.SetBool(begin, end) }
-  / <array>    { p.SetArray(begin, end) }
+    <datetime>    { p.SetTime(begin, end) }
+  / <float>       { p.SetFloat64(begin, end) }
+  / <integer>     { p.SetInt64(begin, end) }
+  / <string>      { p.SetString(begin, end) }
+  / <boolean>     { p.SetBool(begin, end) }
+  / <array>       { p.SetArray(begin, end) }
+  / inlineTable
 )
 
 table <- stdTable / arrayTable
@@ -42,15 +47,25 @@ stdTable <- '[' ws <tableKey> ws ']' { p.SetTable(p.buffer, begin, end) }
 
 arrayTable <- '[[' ws <tableKey> ws ']]' { p.SetArrayTable(p.buffer, begin, end) }
 
+inlineTable <- (
+    '{' { p.StartInlineTable() }
+    ws inlineTableKeyValues ws
+    '}' { p.EndInlineTable() }
+)
+
+inlineTableKeyValues <- (keyval inlineTableValSep?)*
+
 tableKey <- key (tableKeySep key)*
 
 tableKeySep <- ws '.' ws
 
+inlineTableValSep <- ws ',' ws
+
 integer <- [\-+]? int
-int <- '0' / [1-9] digit*
+int <- [1-9] (digit / '_' digit)+ / digit
 
 float <- integer (frac exp? / frac? exp)
-frac <- '.' digit+
+frac <- '.' digit (digit / '_' digit)*
 exp <- [eE] integer
 
 string <- (

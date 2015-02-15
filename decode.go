@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	tableSeparator = "."
+	tableSeparator = '.'
 )
 
 var (
@@ -25,6 +25,9 @@ var (
 	whitespaceReplacer = strings.NewReplacer(
 		" ", "",
 		"\t", "",
+	)
+	underscoreReplacer = strings.NewReplacer(
+		"_", "",
 	)
 )
 
@@ -303,6 +306,11 @@ func (d *decodeState) set(fv reflect.Value, v interface{}) error {
 	return nil
 }
 
+type stack struct {
+	key   string
+	table *table
+}
+
 type toml struct {
 	table        *table
 	line         int
@@ -312,6 +320,8 @@ type toml struct {
 	val          ast.Value
 	arr          *array
 	tableMap     map[string]*table
+	stack        []*stack
+	skip         bool
 }
 
 func (p *toml) init() {
@@ -337,14 +347,14 @@ func (p *tomlParser) SetTime(begin, end int) {
 func (p *tomlParser) SetFloat64(begin, end int) {
 	p.val = &ast.Float{
 		Position: ast.Position{Begin: begin, End: end},
-		Value:    string(p.buffer[begin:end]),
+		Value:    underscoreReplacer.Replace(string(p.buffer[begin:end])),
 	}
 }
 
 func (p *tomlParser) SetInt64(begin, end int) {
 	p.val = &ast.Integer{
 		Position: ast.Position{Begin: begin, End: end},
-		Value:    string(p.buffer[begin:end]),
+		Value:    underscoreReplacer.Replace(string(p.buffer[begin:end])),
 	}
 }
 
@@ -386,11 +396,15 @@ func (p *tomlParser) SetArray(begin, end int) {
 }
 
 func (p *toml) SetTable(buf []rune, begin, end int) {
+	p.setTable(p.table, buf, begin, end)
+}
+
+func (p *toml) setTable(t *table, buf []rune, begin, end int) {
 	name := whitespaceReplacer.Replace(string(buf[begin:end]))
 	if t, exists := p.tableMap[name]; exists {
 		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
 	}
-	t, err := p.lookupTable(strings.Split(name, tableSeparator))
+	t, err := p.lookupTable(t, splitTableKey(name))
 	if err != nil {
 		p.Error(err)
 	}
@@ -404,12 +418,16 @@ func (p *toml) SetTableString(begin, end int) {
 }
 
 func (p *toml) SetArrayTable(buf []rune, begin, end int) {
+	p.setArrayTable(p.table, buf, begin, end)
+}
+
+func (p *toml) setArrayTable(t *table, buf []rune, begin, end int) {
 	name := whitespaceReplacer.Replace(string(buf[begin:end]))
 	if t, exists := p.tableMap[name]; exists && t.tableType == tableTypeNormal {
 		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
 	}
-	names := strings.Split(name, tableSeparator)
-	t, err := p.lookupTable(names[:len(names)-1])
+	names := splitTableKey(name)
+	t, err := p.lookupTable(t, names[:len(names)-1])
 	if err != nil {
 		p.Error(err)
 	}
@@ -428,12 +446,32 @@ func (p *toml) SetArrayTable(buf []rune, begin, end int) {
 	case []*table:
 		t.fieldMap[last] = append(v, tbl)
 	case *keyValue:
+		fmt.Printf("%q\n", "----------------------")
 		p.Error(fmt.Errorf("key `%s' is in conflict with line %d", last, v.line))
 	default:
 		p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", last, v))
 	}
 	p.currentTable = tbl
 	p.tableMap[name] = p.currentTable
+}
+
+func (p *toml) StartInlineTable() {
+	p.skip = false
+	p.stack = append(p.stack, &stack{p.key, p.currentTable})
+	buf := []rune(p.key)
+	if p.arr == nil {
+		p.setTable(p.currentTable, buf, 0, len(buf))
+	} else {
+		p.setArrayTable(p.currentTable, buf, 0, len(buf))
+	}
+}
+
+func (p *toml) EndInlineTable() {
+	st := p.stack[len(p.stack)-1]
+	p.key, p.currentTable = st.key, st.table
+	p.stack[len(p.stack)-1] = nil
+	p.stack = p.stack[:len(p.stack)-1]
+	p.skip = true
 }
 
 func (p *toml) AddLineCount(i int) {
@@ -445,6 +483,10 @@ func (p *toml) SetKey(buf []rune, begin, end int) {
 }
 
 func (p *toml) AddKeyValue() {
+	if p.skip {
+		p.skip = false
+		return
+	}
 	if val, exists := p.currentTable.fieldMap[p.key]; exists {
 		switch v := val.(type) {
 		case *table:
@@ -493,8 +535,7 @@ func (p *toml) unquote(s string) string {
 	return s
 }
 
-func (p *toml) lookupTable(keys []string) (*table, error) {
-	t := p.table
+func (p *toml) lookupTable(t *table, keys []string) (*table, error) {
 	for _, s := range keys {
 		val, exists := t.fieldMap[s]
 		if !exists {
@@ -522,6 +563,26 @@ func (p *toml) lookupTable(keys []string) (*table, error) {
 		}
 	}
 	return t, nil
+}
+
+func splitTableKey(tk string) []string {
+	key := make([]byte, 0, 1)
+	keys := make([]string, 0, 1)
+	inQuote := false
+	for i := 0; i < len(tk); i++ {
+		k := tk[i]
+		switch {
+		case k == tableSeparator && !inQuote:
+			keys = append(keys, string(key))
+			key = key[:0] // reuse buffer.
+		case k == '"':
+			inQuote = !inQuote
+		default:
+			key = append(key, k)
+		}
+	}
+	keys = append(keys, string(key))
+	return keys
 }
 
 type convertError struct {
