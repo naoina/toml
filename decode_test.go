@@ -915,3 +915,69 @@ numbers = ["壱", "弐", "参"]
 		t.Errorf(`toml.Unmarshal([]byte(data), &v); v => %#v; want %#v`, actual, expect)
 	}
 }
+
+func TestUnmarshal_WithPointers(t *testing.T) {
+	type Inline struct {
+		Key1 string
+		Key2 *string
+		Key3 **string
+	}
+	type Table struct {
+		Key1 *string
+		Key2 **string
+		Key3 ***string
+	}
+	type testStruct struct {
+		Inline *Inline
+		Tables []*Table
+	}
+	type testStruct2 struct {
+		Inline **Inline
+		Tables []**Table
+	}
+	type testStruct3 struct {
+		Inline ***Inline
+		Tables []***Table
+	}
+	data := `
+inline = { key1 = "test", key2 = "a", key3 = "b" }
+[[tables]]
+key1 = "a"
+key2 = "a"
+key3 = "a"
+[[tables]]
+key1 = "b"
+key2 = "b"
+key3 = "b"
+`
+	s1 := "a"
+	s2 := &s1
+	s3 := &s2
+	s4 := &s3
+	s5 := "b"
+	s6 := &s5
+	s7 := &s6
+	s8 := &s7
+	i1 := &Inline{"test", s2, s7}
+	i2 := &i1
+	i3 := &i2
+	t1 := &Table{s2, s3, s4}
+	t2 := &Table{s6, s7, s8}
+	t3 := &t1
+	t4 := &t2
+	sc := &testStruct{
+		Inline: i1, Tables: []*Table{t1, t2},
+	}
+	ac := &testStruct{}
+	testUnmarshal(t, []testcase{
+		{data, nil, ac, sc},
+		{data, nil, &testStruct2{}, &testStruct2{
+			Inline: i2,
+			Tables: []**Table{&t1, &t2},
+		}},
+		{data, nil, &testStruct3{}, &testStruct3{
+			Inline: i3,
+			Tables: []***Table{&t3, &t4},
+		}},
+	})
+}

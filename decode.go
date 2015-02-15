@@ -122,14 +122,18 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				}
 				continue
 			}
-			if fv.Kind() != reflect.Struct {
-				return fmt.Errorf("line %d: `%v.%s' must be struct type, but `%v' given", v.line, rv.Type(), fieldName, fv.Type())
+			for fv.Kind() == reflect.Ptr {
+				fv.Set(reflect.New(fv.Type().Elem()))
+				fv = fv.Elem()
 			}
-			vv := reflect.New(fv.Type())
-			if err := d.unmarshal(v, vv.Interface()); err != nil {
+			if fv.Kind() != reflect.Struct {
+				return fmt.Errorf("line %d: `%v.%s' must be struct type, but `%v' given", v.line, rv.Type(), fieldName, t)
+			}
+			vv := reflect.New(fv.Type()).Elem()
+			if err := d.unmarshal(v, vv.Addr().Interface()); err != nil {
 				return err
 			}
-			fv.Set(vv.Elem())
+			fv.Set(vv)
 		case []*table:
 			data := make([]string, 0, len(v))
 			for _, tbl := range v {
@@ -144,12 +148,23 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 			if fv.Kind() != reflect.Slice {
 				return fmt.Errorf("line %d: `%v.%s' must be slice type, but `%v' given", v[0].line, rv.Type(), fieldName, fv.Type())
 			}
+			t := fv.Type().Elem()
+			pc := 0
+			for ; t.Kind() == reflect.Ptr; pc++ {
+				t = t.Elem()
+			}
 			for _, tbl := range v {
-				vv := reflect.New(fv.Type().Elem())
-				if err := d.unmarshal(tbl, vv.Interface()); err != nil {
+				vv := reflect.New(t).Elem()
+				if err := d.unmarshal(tbl, vv.Addr().Interface()); err != nil {
 					return err
 				}
-				fv.Set(reflect.Append(fv, vv.Elem()))
+				for i := 0; i < pc; i++ {
+					vv = vv.Addr()
+					pv := reflect.New(vv.Type()).Elem()
+					pv.Set(vv)
+					vv = pv
+				}
+				fv.Set(reflect.Append(fv, vv))
 			}
 		default:
 			return fmt.Errorf("BUG: unknown type `%T'", t)
