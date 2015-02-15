@@ -123,7 +123,7 @@ func testUnmarshal(t *testing.T, testcases []testcase) {
 		if !reflect.DeepEqual(actual, expect) {
 			t.Errorf(`toml.Unmarshal([]byte(%#v), %#v) => %#v; want %#v`, v.data, nil, actual, expect)
 		}
-		if !reflect.DeepEqual(actual, expect) {
+		if !reflect.DeepEqual(v.actual, v.expect) {
 			t.Errorf(`toml.Unmarshal([]byte(%#v), v); v => %#v; want %#v`, v.data, v.actual, v.expect)
 		}
 	}
@@ -193,7 +193,7 @@ trimmed in raw strings.
    is preserved.
 '''`, nil, &testStruct{}, &testStruct{
 			Regex2: `I [dw]on't need \d{2} apples`,
-			Lines:  `The first newline is trimmed in raw strings.    All other whitespace    is preserved.`,
+			Lines:  "The first newline is\ntrimmed in raw strings.\n   All other whitespace\n   is preserved.\n",
 		}},
 	})
 }
@@ -207,7 +207,7 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = +0`, nil, &testStruct{}, &testStruct{0}},
 		{`intval = -0`, nil, &testStruct{}, &testStruct{-0}},
 		{`intval = 1`, nil, &testStruct{}, &testStruct{1}},
-		{`intval = +1`, nil, &testStruct{}, &testStruct{-1}},
+		{`intval = +1`, nil, &testStruct{}, &testStruct{1}},
 		{`intval = -1`, nil, &testStruct{}, &testStruct{-1}},
 		{`intval = 10`, nil, &testStruct{}, &testStruct{10}},
 		{`intval = 777`, nil, &testStruct{}, &testStruct{777}},
@@ -253,7 +253,7 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = -10.2e5`, nil, &testStruct{}, &testStruct{-10.2e5}},
 		{`floatval = 10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
 		{`floatval = +10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
-		{`floatval = -10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
+		{`floatval = -10.2E5`, nil, &testStruct{}, &testStruct{-10.2e5}},
 		{`floatval = 5e+22`, nil, &testStruct{}, &testStruct{5e+22}},
 		{`floatval = 1e6`, nil, &testStruct{}, &testStruct{1e6}},
 		{`floatval = -2E-2`, nil, &testStruct{}, &testStruct{-2E-2}},
@@ -326,28 +326,28 @@ func TestUnmarshal_WithArray(t *testing.T) {
 		{`arrayval = [ [ 1, 2 ], ["a", "b", "c"] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{1, 2},
+					[]interface{}{int64(1), int64(2)},
 					[]interface{}{"a", "b", "c"},
 				},
 			}},
 		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6] ] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{1, 2},
+					[]interface{}{int64(1), int64(2)},
 					[]interface{}{
-						[]interface{}{3, 4},
-						[]interface{}{5, 6},
+						[]interface{}{int64(3), int64(4)},
+						[]interface{}{int64(5), int64(6)},
 					},
 				},
 			}},
 		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6], [7, 8] ] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{1, 2},
+					[]interface{}{int64(1), int64(2)},
 					[]interface{}{
-						[]interface{}{3, 4},
-						[]interface{}{5, 6},
-						[]interface{}{7, 8},
+						[]interface{}{int64(3), int64(4)},
+						[]interface{}{int64(5), int64(6)},
+						[]interface{}{int64(7), int64(8)},
 					},
 				},
 			}},
@@ -355,10 +355,10 @@ func TestUnmarshal_WithArray(t *testing.T) {
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
 					[]interface{}{
-						[]interface{}{1, 2},
+						[]interface{}{int64(1), int64(2)},
 					},
-					[]interface{}{3, 4},
-					[]interface{}{5, 6},
+					[]interface{}{int64(3), int64(4)},
+					[]interface{}{int64(5), int64(6)},
 				},
 			}},
 		{`arrayval = [ 1, 2.0 ] # note: this is NOT ok`, fmt.Errorf("toml: unmarshal: line 1: struct { Arrayval []interface {} }.Arrayval: array cannot contain multiple types"), &struct{ Arrayval []interface{} }{}, &struct{ Arrayval []interface{} }{}},
