@@ -127,7 +127,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				fv = fv.Elem()
 			}
 			if fv.Kind() != reflect.Struct {
-				return fmt.Errorf("line %d: `%v.%s' must be struct type, but `%v' given", v.line, rv.Type(), fieldName, t)
+				return fmt.Errorf("line %d: `%v.%s' must be struct type, but %v given", v.line, rv.Type(), fieldName, fv.Kind())
 			}
 			vv := reflect.New(fv.Type()).Elem()
 			if err := d.unmarshal(v, vv.Addr().Interface()); err != nil {
@@ -146,7 +146,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				continue
 			}
 			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("line %d: `%v.%s' must be slice type, but `%v' given", v[0].line, rv.Type(), fieldName, fv.Type())
+				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", v[0].line, rv.Type(), fieldName, fv.Kind())
 			}
 			t := fv.Type().Elem()
 			pc := 0
