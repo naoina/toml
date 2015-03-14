@@ -99,21 +99,37 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 		return fmt.Errorf("v must not be nil")
 	}
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("v must be a pointer")
+	if kind := rv.Kind(); kind != reflect.Ptr && kind != reflect.Map {
+		return fmt.Errorf("v must be a pointer or map")
 	}
 	for rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
 	}
-	for name, val := range t.fieldMap {
-		fv, fieldName, found := findField(rv, name)
-		if !found {
-			return fmt.Errorf("field corresponding to `%s' is not defined in `%T'", name, v)
+	for key, val := range t.fieldMap {
+		fv, fieldName := rv, key
+		switch rv.Kind() {
+		case reflect.Struct:
+			var found bool
+			fv, fieldName, found = findField(rv, fieldName)
+			if !found {
+				return fmt.Errorf("field corresponding to `%s' is not defined in `%T'", key, v)
+			}
+		case reflect.Map:
+			fv = reflect.New(rv.Type().Elem()).Elem()
 		}
 		switch v := val.(type) {
 		case *keyValue:
-			if err := d.setValue(fv, v.value); err != nil {
-				return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
+			switch fv.Kind() {
+			case reflect.Map:
+				mv := reflect.New(fv.Type().Elem()).Elem()
+				if err := d.unmarshal(t, mv.Addr().Interface()); err != nil {
+					return err
+				}
+				fv.SetMapIndex(reflect.ValueOf(fieldName), mv)
+			default:
+				if err := d.setValue(fv, v.value); err != nil {
+					return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
+				}
 			}
 		case *table:
 			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[v.begin:v.end])); ok {
@@ -126,14 +142,25 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				fv.Set(reflect.New(fv.Type().Elem()))
 				fv = fv.Elem()
 			}
-			if fv.Kind() != reflect.Struct {
-				return fmt.Errorf("line %d: `%v.%s' must be struct type, but %v given", v.line, rv.Type(), fieldName, fv.Kind())
+			switch fv.Kind() {
+			case reflect.Struct:
+				vv := reflect.New(fv.Type()).Elem()
+				if err := d.unmarshal(v, vv.Addr().Interface()); err != nil {
+					return err
+				}
+				fv.Set(vv)
+				if rv.Kind() == reflect.Map {
+					rv.SetMapIndex(reflect.ValueOf(fieldName), fv)
+				}
+			case reflect.Map:
+				mv := reflect.MakeMap(fv.Type())
+				if err := d.unmarshal(v, mv.Interface()); err != nil {
+					return err
+				}
+				fv.Set(mv)
+			default:
+				return fmt.Errorf("line %d: `%v.%s' must be struct or map, but %v given", v.line, rv.Type(), fieldName, fv.Kind())
 			}
-			vv := reflect.New(fv.Type()).Elem()
-			if err := d.unmarshal(v, vv.Addr().Interface()); err != nil {
-				return err
-			}
-			fv.Set(vv)
 		case []*table:
 			data := make([]string, 0, len(v))
 			for _, tbl := range v {
@@ -145,18 +172,27 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				}
 				continue
 			}
-			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", v[0].line, rv.Type(), fieldName, fv.Kind())
-			}
 			t := fv.Type().Elem()
 			pc := 0
 			for ; t.Kind() == reflect.Ptr; pc++ {
 				t = t.Elem()
 			}
+			if fv.Kind() != reflect.Slice {
+				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", v[0].line, rv.Type(), fieldName, fv.Kind())
+			}
 			for _, tbl := range v {
-				vv := reflect.New(t).Elem()
-				if err := d.unmarshal(tbl, vv.Addr().Interface()); err != nil {
-					return err
+				var vv reflect.Value
+				switch t.Kind() {
+				case reflect.Map:
+					vv = reflect.MakeMap(t)
+					if err := d.unmarshal(tbl, vv.Interface()); err != nil {
+						return err
+					}
+				default:
+					vv = reflect.New(t).Elem()
+					if err := d.unmarshal(tbl, vv.Addr().Interface()); err != nil {
+						return err
+					}
 				}
 				for i := 0; i < pc; i++ {
 					vv = vv.Addr()
@@ -165,6 +201,9 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 					vv = pv
 				}
 				fv.Set(reflect.Append(fv, vv))
+			}
+			if rv.Kind() == reflect.Map {
+				rv.SetMapIndex(reflect.ValueOf(fieldName), fv)
 			}
 		default:
 			return fmt.Errorf("BUG: unknown type `%T'", t)
@@ -178,8 +217,10 @@ func (d *decodeState) setUnmarshaler(lhs reflect.Value, data string) (error, boo
 		lhs.Set(reflect.New(lhs.Type().Elem()))
 		lhs = lhs.Elem()
 	}
-	if u, ok := lhs.Addr().Interface().(Unmarshaler); ok {
-		return u.UnmarshalTOML([]byte(data)), true
+	if lhs.CanAddr() {
+		if u, ok := lhs.Addr().Interface().(Unmarshaler); ok {
+			return u.UnmarshalTOML([]byte(data)), true
+		}
 	}
 	return nil, false
 }
@@ -457,7 +498,6 @@ func (p *toml) setArrayTable(t *table, buf []rune, begin, end int) {
 	case []*table:
 		t.fieldMap[last] = append(v, tbl)
 	case *keyValue:
-		fmt.Printf("%q\n", "----------------------")
 		p.Error(fmt.Errorf("key `%s' is in conflict with line %d", last, v.line))
 	default:
 		p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", last, v))

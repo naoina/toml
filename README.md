@@ -73,10 +73,7 @@ type tomlConfig struct {
         ConnectionMax uint
         Enabled       bool
     }
-    Servers struct {
-        Alpha Server
-        Beta  Server
-    }
+    Servers map[string]Server
     Clients struct {
         Data  [][]interface{}
         Hosts []string
@@ -271,6 +268,18 @@ type = "app"
   [server.production]
   ip = "10.0.0.2"
 ```
+
+```go
+type Config struct {
+	Server map[string]Server
+}
+
+type Server struct {
+	IP string
+}
+```
+
+You can also use the following struct instead of map of struct.
 
 ```go
 type Config struct {

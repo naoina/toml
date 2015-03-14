@@ -629,6 +629,12 @@ func TestUnmarshal_WithTable(t *testing.T) {
 			} `toml:"tater . man"`
 		}
 	}
+	type testStructWithMap struct {
+		Servers map[string]struct {
+			IP string
+			DC string
+		}
+	}
 	testUnmarshal(t, []testcase{
 		{`[table]`, nil, &testStruct{}, &testStruct{}},
 		{`[table]
@@ -746,6 +752,29 @@ b = 1`, fmt.Errorf("toml: line 7: key `b' is in conflict with normal table in li
 		{`[.b]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
 		{`[.]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
 		{` = "no key name" # not allowed`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
+		{`[servers]
+[servers.alpha]
+ip = "10.0.0.1"
+dc = "eqdc10"
+[servers.beta]
+ip = "10.0.0.2"
+dc = "eqdc10"
+`, nil, &testStructWithMap{},
+			&testStructWithMap{
+				Servers: map[string]struct {
+					IP string
+					DC string
+				}{
+					"alpha": {
+						IP: "10.0.0.1",
+						DC: "eqdc10",
+					},
+					"beta": {
+						IP: "10.0.0.2",
+						DC: "eqdc10",
+					},
+				},
+			}},
 	})
 }
 
@@ -770,6 +799,11 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 	type testStruct struct {
 		Products []Product
 		Fruit    []Fruit
+	}
+	type testStructWithMap struct {
+		Fruit []map[string][]struct {
+			Name string
+		}
 	}
 	testUnmarshal(t, []testcase{
 		{`[[products]]
@@ -832,6 +866,41 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 						Name: "banana",
 						Variety: []Variety{
 							{Name: "plantain"},
+						},
+					},
+				},
+			}},
+		{`[[fruit]]
+
+		[[fruit.variety]]
+		name = "red delicious"
+
+		[[fruit.variety]]
+		name = "granny smith"
+
+		[[fruit]]
+
+		[[fruit.variety]]
+		name = "plantain"
+
+		[[fruit.area]]
+		name = "phillippines"`, nil, &testStructWithMap{},
+			&testStructWithMap{
+				Fruit: []map[string][]struct {
+					Name string
+				}{
+					{
+						"variety": {
+							{Name: "red delicious"},
+							{Name: "granny smith"},
+						},
+					},
+					{
+						"variety": {
+							{Name: "plantain"},
+						},
+						"area": {
+							{Name: "phillippines"},
 						},
 					},
 				},
