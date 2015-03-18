@@ -6,9 +6,6 @@ import (
 )
 
 func (e *parseError) Line() int {
-	if e.p.line != 0 {
-		return e.p.line
-	}
 	tokens := e.p.tokenTree.Error()
 	positions := make([]int, len(tokens)*2)
 	p := 0
