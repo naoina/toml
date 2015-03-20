@@ -218,7 +218,7 @@ func (node *node32) print(depth int, buffer string) {
 		for c := 0; c < depth; c++ {
 			fmt.Printf(" ")
 		}
-		fmt.Printf("\x1B[34m%v\x1B[m %v\n", rul3s[node.pegRule], strconv.Quote(buffer[node.begin:node.end]))
+		fmt.Printf("\x1B[34m%v\x1B[m %v\n", rul3s[node.pegRule], strconv.Quote(string(([]rune(buffer)[node.begin:node.end]))))
 		if node.up != nil {
 			node.up.print(depth+1, buffer)
 		}
@@ -451,7 +451,7 @@ func (t *tokens16) PrintSyntaxTree(buffer string) {
 		for c := 0; c < int(token.next); c++ {
 			fmt.Printf(" ")
 		}
-		fmt.Printf("\x1B[34m%v\x1B[m %v\n", rul3s[token.pegRule], strconv.Quote(buffer[token.begin:token.end]))
+		fmt.Printf("\x1B[34m%v\x1B[m %v\n", rul3s[token.pegRule], strconv.Quote(string(([]rune(buffer)[token.begin:token.end]))))
 	}
 }
 
@@ -699,7 +699,7 @@ func (t *tokens32) PrintSyntaxTree(buffer string) {
 		for c := 0; c < int(token.next); c++ {
 			fmt.Printf(" ")
 		}
-		fmt.Printf("\x1B[34m%v\x1B[m %v\n", rul3s[token.pegRule], strconv.Quote(buffer[token.begin:token.end]))
+		fmt.Printf("\x1B[34m%v\x1B[m %v\n", rul3s[token.pegRule], strconv.Quote(string(([]rune(buffer)[token.begin:token.end]))))
 	}
 }
 
@@ -831,8 +831,10 @@ func (p *tomlParser) Execute() {
 	buffer, begin, end := p.Buffer, 0, 0
 	for token := range p.tokenTree.Tokens() {
 		switch token.pegRule {
+
 		case rulePegText:
 			begin, end = int(token.begin), int(token.end)
+
 		case ruleAction0:
 			_ = buffer
 		case ruleAction1:
@@ -884,6 +886,7 @@ func (p *tomlParser) Execute() {
 
 		}
 	}
+	_, _, _ = buffer, begin, end
 }
 
 func (p *tomlParser) Init() {
@@ -893,7 +896,7 @@ func (p *tomlParser) Init() {
 	}
 
 	var tree tokenTree = &tokens16{tree: make([]token16, math.MaxInt16)}
-	position, depth, tokenIndex, buffer, rules := 0, 0, 0, p.buffer, p.rules
+	position, depth, tokenIndex, buffer, _rules := 0, 0, 0, p.buffer, p.rules
 
 	p.Parse = func(rule ...int) error {
 		r := 1
@@ -945,7 +948,7 @@ func (p *tomlParser) Init() {
 		return false
 	}*/
 
-	rules = [...]func() bool{
+	_rules = [...]func() bool{
 		nil,
 		/* 0 TOML <- <(Expression (newline Expression)* newline? !. Action0)> */
 		func() bool {
@@ -953,16 +956,16 @@ func (p *tomlParser) Init() {
 			{
 				position1 := position
 				depth++
-				if !rules[ruleExpression]() {
+				if !_rules[ruleExpression]() {
 					goto l0
 				}
 			l2:
 				{
 					position3, tokenIndex3, depth3 := position, tokenIndex, depth
-					if !rules[rulenewline]() {
+					if !_rules[rulenewline]() {
 						goto l3
 					}
-					if !rules[ruleExpression]() {
+					if !_rules[ruleExpression]() {
 						goto l3
 					}
 					goto l2
@@ -971,7 +974,7 @@ func (p *tomlParser) Init() {
 				}
 				{
 					position4, tokenIndex4, depth4 := position, tokenIndex, depth
-					if !rules[rulenewline]() {
+					if !_rules[rulenewline]() {
 						goto l4
 					}
 					goto l5
@@ -1010,7 +1013,7 @@ func (p *tomlParser) Init() {
 					{
 						position12 := position
 						depth++
-						if !rules[rulews]() {
+						if !_rules[rulews]() {
 							goto l11
 						}
 						{
@@ -1025,19 +1028,19 @@ func (p *tomlParser) Init() {
 										goto l15
 									}
 									position++
-									if !rules[rulews]() {
+									if !_rules[rulews]() {
 										goto l15
 									}
 									{
 										position17 := position
 										depth++
-										if !rules[ruletableKey]() {
+										if !_rules[ruletableKey]() {
 											goto l15
 										}
 										depth--
 										add(rulePegText, position17)
 									}
-									if !rules[rulews]() {
+									if !_rules[rulews]() {
 										goto l15
 									}
 									if buffer[position] != rune(']') {
@@ -1064,19 +1067,19 @@ func (p *tomlParser) Init() {
 										goto l11
 									}
 									position++
-									if !rules[rulews]() {
+									if !_rules[rulews]() {
 										goto l11
 									}
 									{
 										position20 := position
 										depth++
-										if !rules[ruletableKey]() {
+										if !_rules[ruletableKey]() {
 											goto l11
 										}
 										depth--
 										add(rulePegText, position20)
 									}
-									if !rules[rulews]() {
+									if !_rules[rulews]() {
 										goto l11
 									}
 									if buffer[position] != rune(']') {
@@ -1098,12 +1101,12 @@ func (p *tomlParser) Init() {
 							depth--
 							add(ruletable, position13)
 						}
-						if !rules[rulews]() {
+						if !_rules[rulews]() {
 							goto l11
 						}
 						{
 							position22, tokenIndex22, depth22 := position, tokenIndex, depth
-							if !rules[rulecomment]() {
+							if !_rules[rulecomment]() {
 								goto l22
 							}
 							goto l23
@@ -1114,18 +1117,18 @@ func (p *tomlParser) Init() {
 					l24:
 						{
 							position25, tokenIndex25, depth25 := position, tokenIndex, depth
-							if !rules[rulewsnl]() {
+							if !_rules[rulewsnl]() {
 								goto l25
 							}
-							if !rules[rulekeyval]() {
+							if !_rules[rulekeyval]() {
 								goto l25
 							}
-							if !rules[rulews]() {
+							if !_rules[rulews]() {
 								goto l25
 							}
 							{
 								position26, tokenIndex26, depth26 := position, tokenIndex, depth
-								if !rules[rulecomment]() {
+								if !_rules[rulecomment]() {
 									goto l26
 								}
 								goto l27
@@ -1146,18 +1149,18 @@ func (p *tomlParser) Init() {
 					goto l10
 				l11:
 					position, tokenIndex, depth = position10, tokenIndex10, depth10
-					if !rules[rulews]() {
+					if !_rules[rulews]() {
 						goto l29
 					}
-					if !rules[rulekeyval]() {
+					if !_rules[rulekeyval]() {
 						goto l29
 					}
-					if !rules[rulews]() {
+					if !_rules[rulews]() {
 						goto l29
 					}
 					{
 						position30, tokenIndex30, depth30 := position, tokenIndex, depth
-						if !rules[rulecomment]() {
+						if !_rules[rulecomment]() {
 							goto l30
 						}
 						goto l31
@@ -1168,12 +1171,12 @@ func (p *tomlParser) Init() {
 					goto l10
 				l29:
 					position, tokenIndex, depth = position10, tokenIndex10, depth10
-					if !rules[rulews]() {
+					if !_rules[rulews]() {
 						goto l32
 					}
 					{
 						position33, tokenIndex33, depth33 := position, tokenIndex, depth
-						if !rules[rulecomment]() {
+						if !_rules[rulecomment]() {
 							goto l33
 						}
 						goto l34
@@ -1184,7 +1187,7 @@ func (p *tomlParser) Init() {
 					goto l10
 				l32:
 					position, tokenIndex, depth = position10, tokenIndex10, depth10
-					if !rules[rulews]() {
+					if !_rules[rulews]() {
 						goto l8
 					}
 				}
@@ -1401,20 +1404,20 @@ func (p *tomlParser) Init() {
 			{
 				position68 := position
 				depth++
-				if !rules[rulekey]() {
+				if !_rules[rulekey]() {
 					goto l67
 				}
-				if !rules[rulews]() {
+				if !_rules[rulews]() {
 					goto l67
 				}
 				if buffer[position] != rune('=') {
 					goto l67
 				}
 				position++
-				if !rules[rulews]() {
+				if !_rules[rulews]() {
 					goto l67
 				}
-				if !rules[ruleval]() {
+				if !_rules[ruleval]() {
 					goto l67
 				}
 				{
@@ -1541,13 +1544,13 @@ func (p *tomlParser) Init() {
 						{
 							position82 := position
 							depth++
-							if !rules[rulebasicChar]() {
+							if !_rules[rulebasicChar]() {
 								goto l70
 							}
 						l83:
 							{
 								position84, tokenIndex84, depth84 := position, tokenIndex, depth
-								if !rules[rulebasicChar]() {
+								if !_rules[rulebasicChar]() {
 									goto l84
 								}
 								goto l83
@@ -1604,10 +1607,10 @@ func (p *tomlParser) Init() {
 									{
 										position96 := position
 										depth++
-										if !rules[ruledigitDual]() {
+										if !_rules[ruledigitDual]() {
 											goto l91
 										}
-										if !rules[ruledigitDual]() {
+										if !_rules[ruledigitDual]() {
 											goto l91
 										}
 										depth--
@@ -1623,7 +1626,7 @@ func (p *tomlParser) Init() {
 								{
 									position97 := position
 									depth++
-									if !rules[ruledigitDual]() {
+									if !_rules[ruledigitDual]() {
 										goto l91
 									}
 									depth--
@@ -1636,7 +1639,7 @@ func (p *tomlParser) Init() {
 								{
 									position98 := position
 									depth++
-									if !rules[ruledigitDual]() {
+									if !_rules[ruledigitDual]() {
 										goto l91
 									}
 									depth--
@@ -1655,14 +1658,14 @@ func (p *tomlParser) Init() {
 								{
 									position100 := position
 									depth++
-									if !rules[ruletimeHour]() {
+									if !_rules[ruletimeHour]() {
 										goto l91
 									}
 									if buffer[position] != rune(':') {
 										goto l91
 									}
 									position++
-									if !rules[ruletimeMinute]() {
+									if !_rules[ruletimeMinute]() {
 										goto l91
 									}
 									if buffer[position] != rune(':') {
@@ -1672,7 +1675,7 @@ func (p *tomlParser) Init() {
 									{
 										position101 := position
 										depth++
-										if !rules[ruledigitDual]() {
+										if !_rules[ruledigitDual]() {
 											goto l91
 										}
 										depth--
@@ -1687,13 +1690,13 @@ func (p *tomlParser) Init() {
 												goto l102
 											}
 											position++
-											if !rules[ruledigit]() {
+											if !_rules[ruledigit]() {
 												goto l102
 											}
 										l105:
 											{
 												position106, tokenIndex106, depth106 := position, tokenIndex, depth
-												if !rules[ruledigit]() {
+												if !_rules[ruledigit]() {
 													goto l106
 												}
 												goto l105
@@ -1741,14 +1744,14 @@ func (p *tomlParser) Init() {
 												position++
 											}
 										l111:
-											if !rules[ruletimeHour]() {
+											if !_rules[ruletimeHour]() {
 												goto l91
 											}
 											if buffer[position] != rune(':') {
 												goto l91
 											}
 											position++
-											if !rules[ruletimeMinute]() {
+											if !_rules[ruletimeMinute]() {
 												goto l91
 											}
 											depth--
@@ -1780,17 +1783,17 @@ func (p *tomlParser) Init() {
 						{
 							position116 := position
 							depth++
-							if !rules[ruleinteger]() {
+							if !_rules[ruleinteger]() {
 								goto l114
 							}
 							{
 								position117, tokenIndex117, depth117 := position, tokenIndex, depth
-								if !rules[rulefrac]() {
+								if !_rules[rulefrac]() {
 									goto l118
 								}
 								{
 									position119, tokenIndex119, depth119 := position, tokenIndex, depth
-									if !rules[ruleexp]() {
+									if !_rules[ruleexp]() {
 										goto l119
 									}
 									goto l120
@@ -1803,7 +1806,7 @@ func (p *tomlParser) Init() {
 								position, tokenIndex, depth = position117, tokenIndex117, depth117
 								{
 									position121, tokenIndex121, depth121 := position, tokenIndex, depth
-									if !rules[rulefrac]() {
+									if !_rules[rulefrac]() {
 										goto l121
 									}
 									goto l122
@@ -1811,7 +1814,7 @@ func (p *tomlParser) Init() {
 									position, tokenIndex, depth = position121, tokenIndex121, depth121
 								}
 							l122:
-								if !rules[ruleexp]() {
+								if !_rules[ruleexp]() {
 									goto l114
 								}
 							}
@@ -1841,7 +1844,7 @@ func (p *tomlParser) Init() {
 								{
 									add(ruleAction15, position)
 								}
-								if !rules[rulews]() {
+								if !_rules[rulews]() {
 									goto l88
 								}
 								{
@@ -1850,7 +1853,7 @@ func (p *tomlParser) Init() {
 								l128:
 									{
 										position129, tokenIndex129, depth129 := position, tokenIndex, depth
-										if !rules[rulekeyval]() {
+										if !_rules[rulekeyval]() {
 											goto l129
 										}
 										{
@@ -1858,14 +1861,14 @@ func (p *tomlParser) Init() {
 											{
 												position132 := position
 												depth++
-												if !rules[rulews]() {
+												if !_rules[rulews]() {
 													goto l130
 												}
 												if buffer[position] != rune(',') {
 													goto l130
 												}
 												position++
-												if !rules[rulews]() {
+												if !_rules[rulews]() {
 													goto l130
 												}
 												depth--
@@ -1883,7 +1886,7 @@ func (p *tomlParser) Init() {
 									depth--
 									add(ruleinlineTableKeyValues, position127)
 								}
-								if !rules[rulews]() {
+								if !_rules[rulews]() {
 									goto l88
 								}
 								if buffer[position] != rune('}') {
@@ -1911,7 +1914,7 @@ func (p *tomlParser) Init() {
 									{
 										add(ruleAction22, position)
 									}
-									if !rules[rulewsnl]() {
+									if !_rules[rulewsnl]() {
 										goto l88
 									}
 									{
@@ -1920,7 +1923,7 @@ func (p *tomlParser) Init() {
 									l138:
 										{
 											position139, tokenIndex139, depth139 := position, tokenIndex, depth
-											if !rules[ruleval]() {
+											if !_rules[ruleval]() {
 												goto l139
 											}
 											{
@@ -1931,14 +1934,14 @@ func (p *tomlParser) Init() {
 												{
 													position143 := position
 													depth++
-													if !rules[rulews]() {
+													if !_rules[rulews]() {
 														goto l141
 													}
 													if buffer[position] != rune(',') {
 														goto l141
 													}
 													position++
-													if !rules[rulewsnl]() {
+													if !_rules[rulewsnl]() {
 														goto l141
 													}
 													depth--
@@ -1953,7 +1956,7 @@ func (p *tomlParser) Init() {
 												position144, tokenIndex144, depth144 := position, tokenIndex, depth
 												{
 													position146, tokenIndex146, depth146 := position, tokenIndex, depth
-													if !rules[rulecomment]() {
+													if !_rules[rulecomment]() {
 														goto l146
 													}
 													goto l147
@@ -1961,7 +1964,7 @@ func (p *tomlParser) Init() {
 													position, tokenIndex, depth = position146, tokenIndex146, depth146
 												}
 											l147:
-												if !rules[rulenewline]() {
+												if !_rules[rulenewline]() {
 													goto l144
 												}
 												goto l145
@@ -1976,7 +1979,7 @@ func (p *tomlParser) Init() {
 										depth--
 										add(rulearrayValues, position137)
 									}
-									if !rules[rulewsnl]() {
+									if !_rules[rulewsnl]() {
 										goto l88
 									}
 									if buffer[position] != rune(']') {
@@ -2130,7 +2133,7 @@ func (p *tomlParser) Init() {
 															goto l164
 														l165:
 															position, tokenIndex, depth = position164, tokenIndex164, depth164
-															if !rules[rulenewline]() {
+															if !_rules[rulenewline]() {
 																goto l162
 															}
 														}
@@ -2256,13 +2259,13 @@ func (p *tomlParser) Init() {
 															depth++
 															{
 																position186, tokenIndex186, depth186 := position, tokenIndex, depth
-																if !rules[rulebasicChar]() {
+																if !_rules[rulebasicChar]() {
 																	goto l187
 																}
 																goto l186
 															l187:
 																position, tokenIndex, depth = position186, tokenIndex186, depth186
-																if !rules[rulenewline]() {
+																if !_rules[rulenewline]() {
 																	goto l184
 																}
 															}
@@ -2276,13 +2279,13 @@ func (p *tomlParser) Init() {
 														goto l183
 													l184:
 														position, tokenIndex, depth = position183, tokenIndex183, depth183
-														if !rules[ruleescape]() {
+														if !_rules[ruleescape]() {
 															goto l182
 														}
-														if !rules[rulenewline]() {
+														if !_rules[rulenewline]() {
 															goto l182
 														}
-														if !rules[rulewsnl]() {
+														if !_rules[rulewsnl]() {
 															goto l182
 														}
 													}
@@ -2328,7 +2331,7 @@ func (p *tomlParser) Init() {
 											l192:
 												{
 													position193, tokenIndex193, depth193 := position, tokenIndex, depth
-													if !rules[rulebasicChar]() {
+													if !_rules[rulebasicChar]() {
 														goto l193
 													}
 													goto l192
@@ -2364,7 +2367,7 @@ func (p *tomlParser) Init() {
 							{
 								position196 := position
 								depth++
-								if !rules[ruleinteger]() {
+								if !_rules[ruleinteger]() {
 									goto l88
 								}
 								depth--
@@ -2403,7 +2406,7 @@ func (p *tomlParser) Init() {
 			{
 				position204 := position
 				depth++
-				if !rules[rulekey]() {
+				if !_rules[rulekey]() {
 					goto l203
 				}
 			l205:
@@ -2412,20 +2415,20 @@ func (p *tomlParser) Init() {
 					{
 						position207 := position
 						depth++
-						if !rules[rulews]() {
+						if !_rules[rulews]() {
 							goto l206
 						}
 						if buffer[position] != rune('.') {
 							goto l206
 						}
 						position++
-						if !rules[rulews]() {
+						if !_rules[rulews]() {
 							goto l206
 						}
 						depth--
 						add(ruletableKeySep, position207)
 					}
-					if !rules[rulekey]() {
+					if !_rules[rulekey]() {
 						goto l206
 					}
 					goto l205
@@ -2483,7 +2486,7 @@ func (p *tomlParser) Init() {
 						position++
 						{
 							position221, tokenIndex221, depth221 := position, tokenIndex, depth
-							if !rules[ruledigit]() {
+							if !_rules[ruledigit]() {
 								goto l222
 							}
 							goto l221
@@ -2493,7 +2496,7 @@ func (p *tomlParser) Init() {
 								goto l218
 							}
 							position++
-							if !rules[ruledigit]() {
+							if !_rules[ruledigit]() {
 								goto l218
 							}
 						}
@@ -2503,7 +2506,7 @@ func (p *tomlParser) Init() {
 							position220, tokenIndex220, depth220 := position, tokenIndex, depth
 							{
 								position223, tokenIndex223, depth223 := position, tokenIndex, depth
-								if !rules[ruledigit]() {
+								if !_rules[ruledigit]() {
 									goto l224
 								}
 								goto l223
@@ -2513,7 +2516,7 @@ func (p *tomlParser) Init() {
 									goto l220
 								}
 								position++
-								if !rules[ruledigit]() {
+								if !_rules[ruledigit]() {
 									goto l220
 								}
 							}
@@ -2525,7 +2528,7 @@ func (p *tomlParser) Init() {
 						goto l217
 					l218:
 						position, tokenIndex, depth = position217, tokenIndex217, depth217
-						if !rules[ruledigit]() {
+						if !_rules[ruledigit]() {
 							goto l210
 						}
 					}
@@ -2555,7 +2558,7 @@ func (p *tomlParser) Init() {
 					goto l227
 				}
 				position++
-				if !rules[ruledigit]() {
+				if !_rules[ruledigit]() {
 					goto l227
 				}
 			l229:
@@ -2563,7 +2566,7 @@ func (p *tomlParser) Init() {
 					position230, tokenIndex230, depth230 := position, tokenIndex, depth
 					{
 						position231, tokenIndex231, depth231 := position, tokenIndex, depth
-						if !rules[ruledigit]() {
+						if !_rules[ruledigit]() {
 							goto l232
 						}
 						goto l231
@@ -2573,7 +2576,7 @@ func (p *tomlParser) Init() {
 							goto l230
 						}
 						position++
-						if !rules[ruledigit]() {
+						if !_rules[ruledigit]() {
 							goto l230
 						}
 					}
@@ -2590,7 +2593,7 @@ func (p *tomlParser) Init() {
 			position, tokenIndex, depth = position227, tokenIndex227, depth227
 			return false
 		},
-		/* 23 exp <- <(('e' / 'E') integer)> */
+		/* 23 exp <- <(('e' / 'E') ('-' / '+')? digit (digit / ('_' digit))*)> */
 		func() bool {
 			position233, tokenIndex233, depth233 := position, tokenIndex, depth
 			{
@@ -2611,8 +2614,54 @@ func (p *tomlParser) Init() {
 					position++
 				}
 			l235:
-				if !rules[ruleinteger]() {
+				{
+					position237, tokenIndex237, depth237 := position, tokenIndex, depth
+					{
+						position239, tokenIndex239, depth239 := position, tokenIndex, depth
+						if buffer[position] != rune('-') {
+							goto l240
+						}
+						position++
+						goto l239
+					l240:
+						position, tokenIndex, depth = position239, tokenIndex239, depth239
+						if buffer[position] != rune('+') {
+							goto l237
+						}
+						position++
+					}
+				l239:
+					goto l238
+				l237:
+					position, tokenIndex, depth = position237, tokenIndex237, depth237
+				}
+			l238:
+				if !_rules[ruledigit]() {
 					goto l233
+				}
+			l241:
+				{
+					position242, tokenIndex242, depth242 := position, tokenIndex, depth
+					{
+						position243, tokenIndex243, depth243 := position, tokenIndex, depth
+						if !_rules[ruledigit]() {
+							goto l244
+						}
+						goto l243
+					l244:
+						position, tokenIndex, depth = position243, tokenIndex243, depth243
+						if buffer[position] != rune('_') {
+							goto l242
+						}
+						position++
+						if !_rules[ruledigit]() {
+							goto l242
+						}
+					}
+				l243:
+					goto l241
+				l242:
+					position, tokenIndex, depth = position242, tokenIndex242, depth242
 				}
 				depth--
 				add(ruleexp, position234)
@@ -2628,32 +2677,32 @@ func (p *tomlParser) Init() {
 		nil,
 		/* 26 basicChar <- <(basicUnescaped / escaped)> */
 		func() bool {
-			position239, tokenIndex239, depth239 := position, tokenIndex, depth
+			position247, tokenIndex247, depth247 := position, tokenIndex, depth
 			{
-				position240 := position
+				position248 := position
 				depth++
 				{
-					position241, tokenIndex241, depth241 := position, tokenIndex, depth
+					position249, tokenIndex249, depth249 := position, tokenIndex, depth
 					{
-						position243 := position
+						position251 := position
 						depth++
 						{
 							switch buffer[position] {
 							case ' ', '!':
 								if c := buffer[position]; c < rune(' ') || c > rune('!') {
-									goto l242
+									goto l250
 								}
 								position++
 								break
 							case '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[':
 								if c := buffer[position]; c < rune('#') || c > rune('[') {
-									goto l242
+									goto l250
 								}
 								position++
 								break
 							default:
 								if c := buffer[position]; c < rune(']') || c > rune('\U0010ffff') {
-									goto l242
+									goto l250
 								}
 								position++
 								break
@@ -2661,85 +2710,85 @@ func (p *tomlParser) Init() {
 						}
 
 						depth--
-						add(rulebasicUnescaped, position243)
+						add(rulebasicUnescaped, position251)
 					}
-					goto l241
-				l242:
-					position, tokenIndex, depth = position241, tokenIndex241, depth241
+					goto l249
+				l250:
+					position, tokenIndex, depth = position249, tokenIndex249, depth249
 					{
-						position245 := position
+						position253 := position
 						depth++
-						if !rules[ruleescape]() {
-							goto l239
+						if !_rules[ruleescape]() {
+							goto l247
 						}
 						{
 							switch buffer[position] {
 							case 'U':
 								if buffer[position] != rune('U') {
-									goto l239
+									goto l247
 								}
 								position++
-								if !rules[rulehexQuad]() {
-									goto l239
+								if !_rules[rulehexQuad]() {
+									goto l247
 								}
-								if !rules[rulehexQuad]() {
-									goto l239
+								if !_rules[rulehexQuad]() {
+									goto l247
 								}
 								break
 							case 'u':
 								if buffer[position] != rune('u') {
-									goto l239
+									goto l247
 								}
 								position++
-								if !rules[rulehexQuad]() {
-									goto l239
+								if !_rules[rulehexQuad]() {
+									goto l247
 								}
 								break
 							case '\\':
 								if buffer[position] != rune('\\') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							case '/':
 								if buffer[position] != rune('/') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							case '"':
 								if buffer[position] != rune('"') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							case 'r':
 								if buffer[position] != rune('r') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							case 'f':
 								if buffer[position] != rune('f') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							case 'n':
 								if buffer[position] != rune('n') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							case 't':
 								if buffer[position] != rune('t') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
 							default:
 								if buffer[position] != rune('b') {
-									goto l239
+									goto l247
 								}
 								position++
 								break
@@ -2747,16 +2796,16 @@ func (p *tomlParser) Init() {
 						}
 
 						depth--
-						add(ruleescaped, position245)
+						add(ruleescaped, position253)
 					}
 				}
-			l241:
+			l249:
 				depth--
-				add(rulebasicChar, position240)
+				add(rulebasicChar, position248)
 			}
 			return true
-		l239:
-			position, tokenIndex, depth = position239, tokenIndex239, depth239
+		l247:
+			position, tokenIndex, depth = position247, tokenIndex247, depth247
 			return false
 		},
 		/* 27 escaped <- <(escape ((&('U') ('U' hexQuad hexQuad)) | (&('u') ('u' hexQuad)) | (&('\\') '\\') | (&('/') '/') | (&('"') '"') | (&('r') 'r') | (&('f') 'f') | (&('n') 'n') | (&('t') 't') | (&('b') 'b')))> */
@@ -2765,20 +2814,20 @@ func (p *tomlParser) Init() {
 		nil,
 		/* 29 escape <- <'\\'> */
 		func() bool {
-			position249, tokenIndex249, depth249 := position, tokenIndex, depth
+			position257, tokenIndex257, depth257 := position, tokenIndex, depth
 			{
-				position250 := position
+				position258 := position
 				depth++
 				if buffer[position] != rune('\\') {
-					goto l249
+					goto l257
 				}
 				position++
 				depth--
-				add(ruleescape, position250)
+				add(ruleescape, position258)
 			}
 			return true
-		l249:
-			position, tokenIndex, depth = position249, tokenIndex249, depth249
+		l257:
+			position, tokenIndex, depth = position257, tokenIndex257, depth257
 			return false
 		},
 		/* 30 mlBasicString <- <('"' '"' '"' mlBasicBody ('"' '"' '"') Action18)> */
@@ -2797,27 +2846,27 @@ func (p *tomlParser) Init() {
 		nil,
 		/* 37 hexdigit <- <((&('a' | 'b' | 'c' | 'd' | 'e' | 'f') [a-f]) | (&('A' | 'B' | 'C' | 'D' | 'E' | 'F') [A-F]) | (&('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') [0-9]))> */
 		func() bool {
-			position258, tokenIndex258, depth258 := position, tokenIndex, depth
+			position266, tokenIndex266, depth266 := position, tokenIndex, depth
 			{
-				position259 := position
+				position267 := position
 				depth++
 				{
 					switch buffer[position] {
 					case 'a', 'b', 'c', 'd', 'e', 'f':
 						if c := buffer[position]; c < rune('a') || c > rune('f') {
-							goto l258
+							goto l266
 						}
 						position++
 						break
 					case 'A', 'B', 'C', 'D', 'E', 'F':
 						if c := buffer[position]; c < rune('A') || c > rune('F') {
-							goto l258
+							goto l266
 						}
 						position++
 						break
 					default:
 						if c := buffer[position]; c < rune('0') || c > rune('9') {
-							goto l258
+							goto l266
 						}
 						position++
 						break
@@ -2825,37 +2874,37 @@ func (p *tomlParser) Init() {
 				}
 
 				depth--
-				add(rulehexdigit, position259)
+				add(rulehexdigit, position267)
 			}
 			return true
-		l258:
-			position, tokenIndex, depth = position258, tokenIndex258, depth258
+		l266:
+			position, tokenIndex, depth = position266, tokenIndex266, depth266
 			return false
 		},
 		/* 38 hexQuad <- <(hexdigit hexdigit hexdigit hexdigit)> */
 		func() bool {
-			position261, tokenIndex261, depth261 := position, tokenIndex, depth
+			position269, tokenIndex269, depth269 := position, tokenIndex, depth
 			{
-				position262 := position
+				position270 := position
 				depth++
-				if !rules[rulehexdigit]() {
-					goto l261
+				if !_rules[rulehexdigit]() {
+					goto l269
 				}
-				if !rules[rulehexdigit]() {
-					goto l261
+				if !_rules[rulehexdigit]() {
+					goto l269
 				}
-				if !rules[rulehexdigit]() {
-					goto l261
+				if !_rules[rulehexdigit]() {
+					goto l269
 				}
-				if !rules[rulehexdigit]() {
-					goto l261
+				if !_rules[rulehexdigit]() {
+					goto l269
 				}
 				depth--
-				add(rulehexQuad, position262)
+				add(rulehexQuad, position270)
 			}
 			return true
-		l261:
-			position, tokenIndex, depth = position261, tokenIndex261, depth261
+		l269:
+			position, tokenIndex, depth = position269, tokenIndex269, depth269
 			return false
 		},
 		/* 39 boolean <- <(('t' 'r' 'u' 'e') / ('f' 'a' 'l' 's' 'e'))> */
@@ -2868,36 +2917,36 @@ func (p *tomlParser) Init() {
 		nil,
 		/* 43 timeHour <- <digitDual> */
 		func() bool {
-			position267, tokenIndex267, depth267 := position, tokenIndex, depth
+			position275, tokenIndex275, depth275 := position, tokenIndex, depth
 			{
-				position268 := position
+				position276 := position
 				depth++
-				if !rules[ruledigitDual]() {
-					goto l267
+				if !_rules[ruledigitDual]() {
+					goto l275
 				}
 				depth--
-				add(ruletimeHour, position268)
+				add(ruletimeHour, position276)
 			}
 			return true
-		l267:
-			position, tokenIndex, depth = position267, tokenIndex267, depth267
+		l275:
+			position, tokenIndex, depth = position275, tokenIndex275, depth275
 			return false
 		},
 		/* 44 timeMinute <- <digitDual> */
 		func() bool {
-			position269, tokenIndex269, depth269 := position, tokenIndex, depth
+			position277, tokenIndex277, depth277 := position, tokenIndex, depth
 			{
-				position270 := position
+				position278 := position
 				depth++
-				if !rules[ruledigitDual]() {
-					goto l269
+				if !_rules[ruledigitDual]() {
+					goto l277
 				}
 				depth--
-				add(ruletimeMinute, position270)
+				add(ruletimeMinute, position278)
 			}
 			return true
-		l269:
-			position, tokenIndex, depth = position269, tokenIndex269, depth269
+		l277:
+			position, tokenIndex, depth = position277, tokenIndex277, depth277
 			return false
 		},
 		/* 45 timeSecond <- <digitDual> */
@@ -2918,40 +2967,40 @@ func (p *tomlParser) Init() {
 		nil,
 		/* 53 digit <- <[0-9]> */
 		func() bool {
-			position279, tokenIndex279, depth279 := position, tokenIndex, depth
+			position287, tokenIndex287, depth287 := position, tokenIndex, depth
 			{
-				position280 := position
+				position288 := position
 				depth++
 				if c := buffer[position]; c < rune('0') || c > rune('9') {
-					goto l279
+					goto l287
 				}
 				position++
 				depth--
-				add(ruledigit, position280)
+				add(ruledigit, position288)
 			}
 			return true
-		l279:
-			position, tokenIndex, depth = position279, tokenIndex279, depth279
+		l287:
+			position, tokenIndex, depth = position287, tokenIndex287, depth287
 			return false
 		},
 		/* 54 digitDual <- <(digit digit)> */
 		func() bool {
-			position281, tokenIndex281, depth281 := position, tokenIndex, depth
+			position289, tokenIndex289, depth289 := position, tokenIndex, depth
 			{
-				position282 := position
+				position290 := position
 				depth++
-				if !rules[ruledigit]() {
-					goto l281
+				if !_rules[ruledigit]() {
+					goto l289
 				}
-				if !rules[ruledigit]() {
-					goto l281
+				if !_rules[ruledigit]() {
+					goto l289
 				}
 				depth--
-				add(ruledigitDual, position282)
+				add(ruledigitDual, position290)
 			}
 			return true
-		l281:
-			position, tokenIndex, depth = position281, tokenIndex281, depth281
+		l289:
+			position, tokenIndex, depth = position289, tokenIndex289, depth289
 			return false
 		},
 		/* 55 digitQuad <- <(digitDual digitDual)> */
@@ -3012,5 +3061,5 @@ func (p *tomlParser) Init() {
 		/* 84 Action23 <- <{ p.AddArrayVal() }> */
 		nil,
 	}
-	p.rules = rules
+	p.rules = _rules
 }

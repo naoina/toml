@@ -463,6 +463,7 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = 6.626e-34`, nil, &testStruct{}, &testStruct{6.626e-34}},
 		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{}, &testStruct{9224617.445991228313}},
 		{`floatval = 1e1_00`, nil, &testStruct{}, &testStruct{1e100}},
+		{`floatval = 1e02`, nil, &testStruct{}, &testStruct{1e2}},
 		{`floatval = _1e1_00`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
 		{`floatval = 1e1_00_`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
 	})
