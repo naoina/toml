@@ -106,19 +106,12 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 		rv = rv.Elem()
 	}
 	for key, val := range t.fieldMap {
-		fv, fieldName := rv, key
-		switch rv.Kind() {
-		case reflect.Struct:
-			var found bool
-			fv, fieldName, found = findField(rv, fieldName)
-			if !found {
-				return fmt.Errorf("field corresponding to `%s' is not defined in `%T'", key, v)
-			}
-		case reflect.Map:
-			fv = reflect.New(rv.Type().Elem()).Elem()
-		}
-		switch v := val.(type) {
+		switch av := val.(type) {
 		case *keyValue:
+			fv, fieldName, found := findField(rv, key)
+			if !found {
+				return fmt.Errorf("line %d: field corresponding to `%s' is not defined in `%T'", av.line, key, v)
+			}
 			switch fv.Kind() {
 			case reflect.Map:
 				mv := reflect.New(fv.Type().Elem()).Elem()
@@ -127,12 +120,16 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				}
 				fv.SetMapIndex(reflect.ValueOf(fieldName), mv)
 			default:
-				if err := d.setValue(fv, v.value); err != nil {
-					return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
+				if err := d.setValue(fv, av.value); err != nil {
+					return fmt.Errorf("line %d: %v.%s: %v", av.line, rv.Type(), fieldName, err)
 				}
 			}
 		case *table:
-			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[v.begin:v.end])); ok {
+			fv, fieldName, found := findField(rv, key)
+			if !found {
+				return fmt.Errorf("line %d: field corresponding to `%s' is not defined in `%T'", av.line, key, v)
+			}
+			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[av.begin:av.end])); ok {
 				if err != nil {
 					return err
 				}
@@ -145,7 +142,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 			switch fv.Kind() {
 			case reflect.Struct:
 				vv := reflect.New(fv.Type()).Elem()
-				if err := d.unmarshal(v, vv.Addr().Interface()); err != nil {
+				if err := d.unmarshal(av, vv.Addr().Interface()); err != nil {
 					return err
 				}
 				fv.Set(vv)
@@ -154,16 +151,20 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				}
 			case reflect.Map:
 				mv := reflect.MakeMap(fv.Type())
-				if err := d.unmarshal(v, mv.Interface()); err != nil {
+				if err := d.unmarshal(av, mv.Interface()); err != nil {
 					return err
 				}
 				fv.Set(mv)
 			default:
-				return fmt.Errorf("line %d: `%v.%s' must be struct or map, but %v given", v.line, rv.Type(), fieldName, fv.Kind())
+				return fmt.Errorf("line %d: `%v.%s' must be struct or map, but %v given", av.line, rv.Type(), fieldName, fv.Kind())
 			}
 		case []*table:
-			data := make([]string, 0, len(v))
-			for _, tbl := range v {
+			fv, fieldName, found := findField(rv, key)
+			if !found {
+				return fmt.Errorf("line %d: field corresponding to `%s' is not defined in `%T'", av[0].line, key, v)
+			}
+			data := make([]string, 0, len(av))
+			for _, tbl := range av {
 				data = append(data, string(d.p.buffer[tbl.begin:tbl.end]))
 			}
 			if err, ok := d.setUnmarshaler(fv, strings.Join(data, "\n")); ok {
@@ -178,9 +179,9 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				t = t.Elem()
 			}
 			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", v[0].line, rv.Type(), fieldName, fv.Kind())
+				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", av[0].line, rv.Type(), fieldName, fv.Kind())
 			}
-			for _, tbl := range v {
+			for _, tbl := range av {
 				var vv reflect.Value
 				switch t.Kind() {
 				case reflect.Map:

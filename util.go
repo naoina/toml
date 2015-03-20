@@ -36,24 +36,29 @@ const (
 )
 
 func findField(rv reflect.Value, name string) (field reflect.Value, fieldName string, found bool) {
-	rt := rv.Type()
-	for i := 0; i < rt.NumField(); i++ {
-		ft := rt.Field(i)
-		if !ast.IsExported(ft.Name) {
-			continue
+	switch rv.Kind() {
+	case reflect.Struct:
+		rt := rv.Type()
+		for i := 0; i < rt.NumField(); i++ {
+			ft := rt.Field(i)
+			if !ast.IsExported(ft.Name) {
+				continue
+			}
+			if tag := ft.Tag.Get(fieldTagName); tag == name {
+				return rv.Field(i), ft.Name, true
+			}
 		}
-		if tag := ft.Tag.Get(fieldTagName); tag == name {
-			return rv.Field(i), ft.Name, true
+		for _, name := range []string{
+			strings.Title(name),
+			toCamelCase(name),
+			strings.ToUpper(name),
+		} {
+			if field := rv.FieldByName(name); field.IsValid() {
+				return field, name, true
+			}
 		}
-	}
-	for _, name := range []string{
-		strings.Title(name),
-		toCamelCase(name),
-		strings.ToUpper(name),
-	} {
-		if field := rv.FieldByName(name); field.IsValid() {
-			return field, name, true
-		}
+	case reflect.Map:
+		return reflect.New(rv.Type().Elem()).Elem(), name, true
 	}
 	return field, "", false
 }
