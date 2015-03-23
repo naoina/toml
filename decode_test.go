@@ -848,6 +848,10 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 		[[fruit]]
 		name = "banana"
 
+		[fruit.physical]
+		color = "yellow"
+		shape = "lune"
+
 		[[fruit.variety]]
 		name = "plantain"`, nil, &testStruct{},
 			&testStruct{
@@ -865,6 +869,10 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 					},
 					{
 						Name: "banana",
+						Physical: Physical{
+							Color: "yellow",
+							Shape: "lune",
+						},
 						Variety: []Variety{
 							{Name: "plantain"},
 						},
@@ -916,6 +924,16 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 		# This table conflicts with the previous table
 		[fruit.variety]
 		name = "granny smith"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with array table in line 5"), &testStruct{}, &testStruct{}},
+		{`# INVALID TOML DOC
+		[[fruit]]
+		name = "apple"
+
+		[fruit.variety]
+		name = "granny smith"
+
+		# This table conflicts with the previous table
+		[[fruit.variety]]
+		name = "red delicious"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with normal table in line 5"), &testStruct{}, &testStruct{}},
 	})
 }
 

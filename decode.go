@@ -454,10 +454,13 @@ func (p *toml) SetTable(buf []rune, begin, end int) {
 
 func (p *toml) setTable(t *table, buf []rune, begin, end int) {
 	name := string(buf[begin:end])
+	names := splitTableKey(name)
 	if t, exists := p.tableMap[name]; exists {
-		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
+		if lt := p.tableMap[names[len(names)-1]]; t.tableType == tableTypeArray || lt != nil && lt.tableType == tableTypeNormal {
+			p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
+		}
 	}
-	t, err := p.lookupTable(t, splitTableKey(name))
+	t, err := p.lookupTable(t, names)
 	if err != nil {
 		p.Error(err)
 	}
