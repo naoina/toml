@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/naoina/toml/ast"
 )
@@ -242,7 +241,7 @@ func setValue(lhs reflect.Value, val ast.Value) error {
 }
 
 func setInt(fv reflect.Value, v *ast.Integer) error {
-	i, err := strconv.ParseInt(v.Value, 10, 64)
+	i, err := v.Int()
 	if err != nil {
 		return err
 	}
@@ -263,7 +262,7 @@ func setInt(fv reflect.Value, v *ast.Integer) error {
 }
 
 func setFloat(fv reflect.Value, v *ast.Float) error {
-	f, err := strconv.ParseFloat(v.Value, 64)
+	f, err := v.Float()
 	if err != nil {
 		return err
 	}
@@ -286,7 +285,7 @@ func setString(fv reflect.Value, v *ast.String) error {
 }
 
 func setBoolean(fv reflect.Value, v *ast.Boolean) error {
-	b, err := strconv.ParseBool(v.Value)
+	b, err := v.Boolean()
 	if err != nil {
 		return err
 	}
@@ -294,7 +293,7 @@ func setBoolean(fv reflect.Value, v *ast.Boolean) error {
 }
 
 func setDatetime(fv reflect.Value, v *ast.Datetime) error {
-	tm, err := time.Parse(time.RFC3339Nano, v.Value)
+	tm, err := v.Time()
 	if err != nil {
 		return err
 	}

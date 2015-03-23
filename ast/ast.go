@@ -1,5 +1,10 @@
 package ast
 
+import (
+	"strconv"
+	"time"
+)
+
 type Position struct {
 	Begin int
 	End   int
@@ -47,6 +52,10 @@ func (i *Integer) Source() string {
 	return string(i.Data)
 }
 
+func (i *Integer) Int() (int64, error) {
+	return strconv.ParseInt(i.Value, 10, 64)
+}
+
 type Float struct {
 	Position Position
 	Value    string
@@ -63,6 +72,10 @@ func (f *Float) End() int {
 
 func (f *Float) Source() string {
 	return string(f.Data)
+}
+
+func (f *Float) Float() (float64, error) {
+	return strconv.ParseFloat(f.Value, 64)
 }
 
 type Boolean struct {
@@ -83,6 +96,10 @@ func (b *Boolean) Source() string {
 	return string(b.Data)
 }
 
+func (b *Boolean) Boolean() (bool, error) {
+	return strconv.ParseBool(b.Value)
+}
+
 type Datetime struct {
 	Position Position
 	Value    string
@@ -99,6 +116,10 @@ func (d *Datetime) End() int {
 
 func (d *Datetime) Source() string {
 	return string(d.Data)
+}
+
+func (d *Datetime) Time() (time.Time, error) {
+	return time.Parse(time.RFC3339Nano, d.Value)
 }
 
 type Array struct {
