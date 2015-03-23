@@ -61,53 +61,6 @@ type Unmarshaler interface {
 	UnmarshalTOML([]byte) error
 }
 
-// Given TOML, return an AST representation. The toplevel is represented
-// by a table.
-func Parse(data []byte) (*ast.Table, error) {
-	d := &decodeState{p: &tomlParser{Buffer: string(data)}}
-	d.init()
-
-	if err := d.parse(); err != nil {
-		return nil, err
-	}
-
-	return d.p.toml.table, nil
-}
-
-type decodeState struct {
-	p *tomlParser
-}
-
-func (d *decodeState) init() {
-	d.p.Init()
-	d.p.toml.init()
-}
-
-func (d *decodeState) parse() error {
-	if err := d.p.Parse(); err != nil {
-		if err, ok := err.(*parseError); ok {
-			return fmt.Errorf("toml: line %d: parse error", err.Line())
-		}
-		return err
-	}
-	return d.execute()
-}
-
-func (d *decodeState) execute() (err error) {
-	defer func() {
-		e := recover()
-		if e != nil {
-			cerr, ok := e.(convertError)
-			if !ok {
-				panic(e)
-			}
-			err = cerr.err
-		}
-	}()
-	d.p.Execute()
-	return nil
-}
-
 // UnmarshalTable applies the contents of an ast.Table to the value pointed at by v.
 //
 // UnmarshalTable will mapped to v that according to following rules:
