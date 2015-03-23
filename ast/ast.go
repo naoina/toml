@@ -8,11 +8,13 @@ type Position struct {
 type Value interface {
 	Pos() int
 	End() int
+	Source() string
 }
 
 type String struct {
 	Position Position
 	Value    string
+	Data     []rune
 }
 
 func (s *String) Pos() int {
@@ -23,9 +25,14 @@ func (s *String) End() int {
 	return s.Position.End
 }
 
+func (s *String) Source() string {
+	return string(s.Data)
+}
+
 type Integer struct {
 	Position Position
 	Value    string
+	Data     []rune
 }
 
 func (i *Integer) Pos() int {
@@ -36,9 +43,14 @@ func (i *Integer) End() int {
 	return i.Position.End
 }
 
+func (i *Integer) Source() string {
+	return string(i.Data)
+}
+
 type Float struct {
 	Position Position
 	Value    string
+	Data     []rune
 }
 
 func (f *Float) Pos() int {
@@ -49,9 +61,14 @@ func (f *Float) End() int {
 	return f.Position.End
 }
 
+func (f *Float) Source() string {
+	return string(f.Data)
+}
+
 type Boolean struct {
 	Position Position
 	Value    string
+	Data     []rune
 }
 
 func (b *Boolean) Pos() int {
@@ -62,9 +79,14 @@ func (b *Boolean) End() int {
 	return b.Position.End
 }
 
+func (b *Boolean) Source() string {
+	return string(b.Data)
+}
+
 type Datetime struct {
 	Position Position
 	Value    string
+	Data     []rune
 }
 
 func (d *Datetime) Pos() int {
@@ -75,9 +97,14 @@ func (d *Datetime) End() int {
 	return d.Position.End
 }
 
+func (d *Datetime) Source() string {
+	return string(d.Data)
+}
+
 type Array struct {
 	Position Position
 	Value    []Value
+	Data     []rune
 }
 
 func (a *Array) Pos() int {
@@ -86,6 +113,10 @@ func (a *Array) Pos() int {
 
 func (a *Array) End() int {
 	return a.Position.End
+}
+
+func (a *Array) Source() string {
+	return string(a.Data)
 }
 
 type TableType uint8
@@ -110,6 +141,7 @@ type Table struct {
 	Name     string
 	Fields   map[string]interface{}
 	Type     TableType
+	Data     []rune
 }
 
 func (t *Table) Pos() int {
@@ -118,6 +150,10 @@ func (t *Table) Pos() int {
 
 func (t *Table) End() int {
 	return t.Position.End
+}
+
+func (t *Table) Source() string {
+	return string(t.Data)
 }
 
 type KeyValue struct {

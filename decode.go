@@ -27,7 +27,7 @@ var (
 	)
 )
 
-// Unmarshal parses the TOML data and sotres the result in the value pointed to by v.
+// Unmarshal parses the TOML data and stores the result in the value pointed to by v.
 //
 // Unmarshal will mapped to v that according to following rules:
 //
@@ -39,15 +39,16 @@ var (
 //	TOML arrays to any type of slice or []interface{}
 //	TOML tables to struct
 //	TOML array of tables to slice of struct
-func Unmarshal(data []byte, v interface{}) (err error) {
-	d := &decodeState{p: &tomlParser{Buffer: string(data)}}
-	d.init()
-	if err := d.parse(); err != nil {
+func Unmarshal(data []byte, v interface{}) error {
+	table, err := Parse(data)
+	if err != nil {
 		return err
 	}
-	if err := d.unmarshal(d.p.toml.table, v); err != nil {
+
+	if err := UnmarshalTable(table, v); err != nil {
 		return fmt.Errorf("toml: unmarshal: %v", err)
 	}
+
 	return nil
 }
 
@@ -58,6 +59,19 @@ func Unmarshal(data []byte, v interface{}) (err error) {
 // returning.
 type Unmarshaler interface {
 	UnmarshalTOML([]byte) error
+}
+
+// Given TOML, return an AST representation. The toplevel is represented
+// by a table.
+func Parse(data []byte) (*ast.Table, error) {
+	d := &decodeState{p: &tomlParser{Buffer: string(data)}}
+	d.init()
+
+	if err := d.parse(); err != nil {
+		return nil, err
+	}
+
+	return d.p.toml.table, nil
 }
 
 type decodeState struct {
@@ -94,7 +108,19 @@ func (d *decodeState) execute() (err error) {
 	return nil
 }
 
-func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
+// UnmarshalTable applies the contents of an ast.Table to the value pointed at by v.
+//
+// UnmarshalTable will mapped to v that according to following rules:
+//
+//	TOML strings to string
+//	TOML integers to any int type
+//	TOML floats to float32 or float64
+//	TOML booleans to bool
+//	TOML datetimes to time.Time
+//	TOML arrays to any type of slice or []interface{}
+//	TOML tables to struct
+//	TOML array of tables to slice of struct
+func UnmarshalTable(t *ast.Table, v interface{}) (err error) {
 	if v == nil {
 		return fmt.Errorf("v must not be nil")
 	}
@@ -122,17 +148,17 @@ func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 			switch fv.Kind() {
 			case reflect.Map:
 				mv := reflect.New(fv.Type().Elem()).Elem()
-				if err := d.unmarshal(t, mv.Addr().Interface()); err != nil {
+				if err := UnmarshalTable(t, mv.Addr().Interface()); err != nil {
 					return err
 				}
 				fv.SetMapIndex(reflect.ValueOf(fieldName), mv)
 			default:
-				if err := d.setValue(fv, v.Value); err != nil {
+				if err := setValue(fv, v.Value); err != nil {
 					return fmt.Errorf("line %d: %v.%s: %v", v.Line, rv.Type(), fieldName, err)
 				}
 			}
 		case *ast.Table:
-			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[v.Pos():v.End()])); ok {
+			if err, ok := setUnmarshaler(fv, string(v.Data)); ok {
 				if err != nil {
 					return err
 				}
@@ -145,7 +171,7 @@ func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 			switch fv.Kind() {
 			case reflect.Struct:
 				vv := reflect.New(fv.Type()).Elem()
-				if err := d.unmarshal(v, vv.Addr().Interface()); err != nil {
+				if err := UnmarshalTable(v, vv.Addr().Interface()); err != nil {
 					return err
 				}
 				fv.Set(vv)
@@ -154,7 +180,7 @@ func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 				}
 			case reflect.Map:
 				mv := reflect.MakeMap(fv.Type())
-				if err := d.unmarshal(v, mv.Interface()); err != nil {
+				if err := UnmarshalTable(v, mv.Interface()); err != nil {
 					return err
 				}
 				fv.Set(mv)
@@ -164,9 +190,9 @@ func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 		case []*ast.Table:
 			data := make([]string, 0, len(v))
 			for _, tbl := range v {
-				data = append(data, string(d.p.buffer[tbl.Pos():tbl.End()]))
+				data = append(data, string(tbl.Data))
 			}
-			if err, ok := d.setUnmarshaler(fv, strings.Join(data, "\n")); ok {
+			if err, ok := setUnmarshaler(fv, strings.Join(data, "\n")); ok {
 				if err != nil {
 					return err
 				}
@@ -185,12 +211,12 @@ func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 				switch t.Kind() {
 				case reflect.Map:
 					vv = reflect.MakeMap(t)
-					if err := d.unmarshal(tbl, vv.Interface()); err != nil {
+					if err := UnmarshalTable(tbl, vv.Interface()); err != nil {
 						return err
 					}
 				default:
 					vv = reflect.New(t).Elem()
-					if err := d.unmarshal(tbl, vv.Addr().Interface()); err != nil {
+					if err := UnmarshalTable(tbl, vv.Addr().Interface()); err != nil {
 						return err
 					}
 				}
@@ -212,7 +238,7 @@ func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 	return nil
 }
 
-func (d *decodeState) setUnmarshaler(lhs reflect.Value, data string) (error, bool) {
+func setUnmarshaler(lhs reflect.Value, data string) (error, bool) {
 	for lhs.Kind() == reflect.Ptr {
 		lhs.Set(reflect.New(lhs.Type().Elem()))
 		lhs = lhs.Elem()
@@ -225,44 +251,44 @@ func (d *decodeState) setUnmarshaler(lhs reflect.Value, data string) (error, boo
 	return nil, false
 }
 
-func (d *decodeState) setValue(lhs reflect.Value, val ast.Value) error {
+func setValue(lhs reflect.Value, val ast.Value) error {
 	for lhs.Kind() == reflect.Ptr {
 		lhs.Set(reflect.New(lhs.Type().Elem()))
 		lhs = lhs.Elem()
 	}
-	if err, ok := d.setUnmarshaler(lhs, string(d.p.buffer[val.Pos():val.End()])); ok {
+	if err, ok := setUnmarshaler(lhs, val.Source()); ok {
 		return err
 	}
 	switch v := val.(type) {
 	case *ast.Integer:
-		if err := d.setInt(lhs, v); err != nil {
+		if err := setInt(lhs, v); err != nil {
 			return err
 		}
 	case *ast.Float:
-		if err := d.setFloat(lhs, v); err != nil {
+		if err := setFloat(lhs, v); err != nil {
 			return err
 		}
 	case *ast.String:
-		if err := d.setString(lhs, v); err != nil {
+		if err := setString(lhs, v); err != nil {
 			return err
 		}
 	case *ast.Boolean:
-		if err := d.setBoolean(lhs, v); err != nil {
+		if err := setBoolean(lhs, v); err != nil {
 			return err
 		}
 	case *ast.Datetime:
-		if err := d.setDatetime(lhs, v); err != nil {
+		if err := setDatetime(lhs, v); err != nil {
 			return err
 		}
 	case *ast.Array:
-		if err := d.setArray(lhs, v); err != nil {
+		if err := setArray(lhs, v); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d *decodeState) setInt(fv reflect.Value, v *ast.Integer) error {
+func setInt(fv reflect.Value, v *ast.Integer) error {
 	i, err := strconv.ParseInt(v.Value, 10, 64)
 	if err != nil {
 		return err
@@ -283,7 +309,7 @@ func (d *decodeState) setInt(fv reflect.Value, v *ast.Integer) error {
 	return nil
 }
 
-func (d *decodeState) setFloat(fv reflect.Value, v *ast.Float) error {
+func setFloat(fv reflect.Value, v *ast.Float) error {
 	f, err := strconv.ParseFloat(v.Value, 64)
 	if err != nil {
 		return err
@@ -302,27 +328,27 @@ func (d *decodeState) setFloat(fv reflect.Value, v *ast.Float) error {
 	return nil
 }
 
-func (d *decodeState) setString(fv reflect.Value, v *ast.String) error {
-	return d.set(fv, v.Value)
+func setString(fv reflect.Value, v *ast.String) error {
+	return set(fv, v.Value)
 }
 
-func (d *decodeState) setBoolean(fv reflect.Value, v *ast.Boolean) error {
+func setBoolean(fv reflect.Value, v *ast.Boolean) error {
 	b, err := strconv.ParseBool(v.Value)
 	if err != nil {
 		return err
 	}
-	return d.set(fv, b)
+	return set(fv, b)
 }
 
-func (d *decodeState) setDatetime(fv reflect.Value, v *ast.Datetime) error {
+func setDatetime(fv reflect.Value, v *ast.Datetime) error {
 	tm, err := time.Parse(time.RFC3339Nano, v.Value)
 	if err != nil {
 		return err
 	}
-	return d.set(fv, tm)
+	return set(fv, tm)
 }
 
-func (d *decodeState) setArray(fv reflect.Value, v *ast.Array) error {
+func setArray(fv reflect.Value, v *ast.Array) error {
 	if len(v.Value) == 0 {
 		return nil
 	}
@@ -340,7 +366,7 @@ func (d *decodeState) setArray(fv reflect.Value, v *ast.Array) error {
 	t := sliceType.Elem()
 	for _, vv := range v.Value {
 		tmp := reflect.New(t).Elem()
-		if err := d.setValue(tmp, vv); err != nil {
+		if err := setValue(tmp, vv); err != nil {
 			return err
 		}
 		slice = reflect.Append(slice, tmp)
@@ -349,7 +375,7 @@ func (d *decodeState) setArray(fv reflect.Value, v *ast.Array) error {
 	return nil
 }
 
-func (d *decodeState) set(fv reflect.Value, v interface{}) error {
+func set(fv reflect.Value, v interface{}) error {
 	rhs := reflect.ValueOf(v)
 	if !rhs.Type().AssignableTo(fv.Type()) {
 		return fmt.Errorf("`%v' type is not assignable to `%v' type", rhs.Type(), fv.Type())
@@ -395,6 +421,7 @@ func (p *toml) Error(err error) {
 func (p *tomlParser) SetTime(begin, end int) {
 	p.val = &ast.Datetime{
 		Position: ast.Position{Begin: begin, End: end},
+		Data:     p.buffer[begin:end],
 		Value:    string(p.buffer[begin:end]),
 	}
 }
@@ -402,6 +429,7 @@ func (p *tomlParser) SetTime(begin, end int) {
 func (p *tomlParser) SetFloat64(begin, end int) {
 	p.val = &ast.Float{
 		Position: ast.Position{Begin: begin, End: end},
+		Data:     p.buffer[begin:end],
 		Value:    underscoreReplacer.Replace(string(p.buffer[begin:end])),
 	}
 }
@@ -409,6 +437,7 @@ func (p *tomlParser) SetFloat64(begin, end int) {
 func (p *tomlParser) SetInt64(begin, end int) {
 	p.val = &ast.Integer{
 		Position: ast.Position{Begin: begin, End: end},
+		Data:     p.buffer[begin:end],
 		Value:    underscoreReplacer.Replace(string(p.buffer[begin:end])),
 	}
 }
@@ -416,6 +445,7 @@ func (p *tomlParser) SetInt64(begin, end int) {
 func (p *tomlParser) SetString(begin, end int) {
 	p.val = &ast.String{
 		Position: ast.Position{Begin: begin, End: end},
+		Data:     p.buffer[begin:end],
 		Value:    p.s,
 	}
 	p.s = ""
@@ -424,6 +454,7 @@ func (p *tomlParser) SetString(begin, end int) {
 func (p *tomlParser) SetBool(begin, end int) {
 	p.val = &ast.Boolean{
 		Position: ast.Position{Begin: begin, End: end},
+		Data:     p.buffer[begin:end],
 		Value:    string(p.buffer[begin:end]),
 	}
 }
@@ -446,6 +477,7 @@ func (p *tomlParser) AddArrayVal() {
 
 func (p *tomlParser) SetArray(begin, end int) {
 	p.arr.current.Position = ast.Position{Begin: begin, End: end}
+	p.arr.current.Data = p.buffer[begin:end]
 	p.val = p.arr.current
 	p.arr = p.arr.parent
 }
@@ -467,7 +499,9 @@ func (p *toml) setTable(t *ast.Table, buf []rune, begin, end int) {
 	p.tableMap[name] = p.currentTable
 }
 
-func (p *toml) SetTableString(begin, end int) {
+func (p *tomlParser) SetTableString(begin, end int) {
+	p.currentTable.Data = p.buffer[begin:end]
+
 	p.currentTable.Position.Begin = begin
 	p.currentTable.Position.End = end
 }
