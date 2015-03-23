@@ -94,7 +94,7 @@ func (d *decodeState) execute() (err error) {
 	return nil
 }
 
-func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
+func (d *decodeState) unmarshal(t *ast.Table, v interface{}) (err error) {
 	if v == nil {
 		return fmt.Errorf("v must not be nil")
 	}
@@ -105,7 +105,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 	for rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
 	}
-	for key, val := range t.fieldMap {
+	for key, val := range t.Fields {
 		fv, fieldName := rv, key
 		switch rv.Kind() {
 		case reflect.Struct:
@@ -118,7 +118,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 			fv = reflect.New(rv.Type().Elem()).Elem()
 		}
 		switch v := val.(type) {
-		case *keyValue:
+		case *ast.KeyValue:
 			switch fv.Kind() {
 			case reflect.Map:
 				mv := reflect.New(fv.Type().Elem()).Elem()
@@ -127,12 +127,12 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				}
 				fv.SetMapIndex(reflect.ValueOf(fieldName), mv)
 			default:
-				if err := d.setValue(fv, v.value); err != nil {
-					return fmt.Errorf("line %d: %v.%s: %v", v.line, rv.Type(), fieldName, err)
+				if err := d.setValue(fv, v.Value); err != nil {
+					return fmt.Errorf("line %d: %v.%s: %v", v.Line, rv.Type(), fieldName, err)
 				}
 			}
-		case *table:
-			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[v.begin:v.end])); ok {
+		case *ast.Table:
+			if err, ok := d.setUnmarshaler(fv, string(d.p.buffer[v.Pos():v.End()])); ok {
 				if err != nil {
 					return err
 				}
@@ -159,12 +159,12 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				}
 				fv.Set(mv)
 			default:
-				return fmt.Errorf("line %d: `%v.%s' must be struct or map, but %v given", v.line, rv.Type(), fieldName, fv.Kind())
+				return fmt.Errorf("line %d: `%v.%s' must be struct or map, but %v given", v.Line, rv.Type(), fieldName, fv.Kind())
 			}
-		case []*table:
+		case []*ast.Table:
 			data := make([]string, 0, len(v))
 			for _, tbl := range v {
-				data = append(data, string(d.p.buffer[tbl.begin:tbl.end]))
+				data = append(data, string(d.p.buffer[tbl.Pos():tbl.End()]))
 			}
 			if err, ok := d.setUnmarshaler(fv, strings.Join(data, "\n")); ok {
 				if err != nil {
@@ -178,7 +178,7 @@ func (d *decodeState) unmarshal(t *table, v interface{}) (err error) {
 				t = t.Elem()
 			}
 			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", v[0].line, rv.Type(), fieldName, fv.Kind())
+				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", v[0].Line, rv.Type(), fieldName, fv.Kind())
 			}
 			for _, tbl := range v {
 				var vv reflect.Value
@@ -360,26 +360,29 @@ func (d *decodeState) set(fv reflect.Value, v interface{}) error {
 
 type stack struct {
 	key   string
-	table *table
+	table *ast.Table
 }
 
 type toml struct {
-	table        *table
+	table        *ast.Table
 	line         int
-	currentTable *table
+	currentTable *ast.Table
 	s            string
 	key          string
 	val          ast.Value
 	arr          *array
-	tableMap     map[string]*table
+	tableMap     map[string]*ast.Table
 	stack        []*stack
 	skip         bool
 }
 
 func (p *toml) init() {
 	p.line = 1
-	p.table = &table{line: p.line, tableType: tableTypeNormal}
-	p.tableMap = map[string]*table{
+	p.table = &ast.Table{
+		Line: p.line,
+		Type: ast.TableTypeNormal,
+	}
+	p.tableMap = map[string]*ast.Table{
 		"": p.table,
 	}
 	p.currentTable = p.table
@@ -451,10 +454,10 @@ func (p *toml) SetTable(buf []rune, begin, end int) {
 	p.setTable(p.table, buf, begin, end)
 }
 
-func (p *toml) setTable(t *table, buf []rune, begin, end int) {
+func (p *toml) setTable(t *ast.Table, buf []rune, begin, end int) {
 	name := string(buf[begin:end])
 	if t, exists := p.tableMap[name]; exists {
-		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
+		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.Type, t.Line))
 	}
 	t, err := p.lookupTable(t, splitTableKey(name))
 	if err != nil {
@@ -465,18 +468,18 @@ func (p *toml) setTable(t *table, buf []rune, begin, end int) {
 }
 
 func (p *toml) SetTableString(begin, end int) {
-	p.currentTable.begin = begin
-	p.currentTable.end = end
+	p.currentTable.Position.Begin = begin
+	p.currentTable.Position.End = end
 }
 
 func (p *toml) SetArrayTable(buf []rune, begin, end int) {
 	p.setArrayTable(p.table, buf, begin, end)
 }
 
-func (p *toml) setArrayTable(t *table, buf []rune, begin, end int) {
+func (p *toml) setArrayTable(t *ast.Table, buf []rune, begin, end int) {
 	name := string(buf[begin:end])
-	if t, exists := p.tableMap[name]; exists && t.tableType == tableTypeNormal {
-		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.tableType, t.line))
+	if t, exists := p.tableMap[name]; exists && t.Type == ast.TableTypeNormal {
+		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.Type, t.Line))
 	}
 	names := splitTableKey(name)
 	t, err := p.lookupTable(t, names[:len(names)-1])
@@ -484,21 +487,22 @@ func (p *toml) setArrayTable(t *table, buf []rune, begin, end int) {
 		p.Error(err)
 	}
 	last := names[len(names)-1]
-	tbl := &table{
-		name:      last,
-		line:      p.line,
-		tableType: tableTypeArray,
+	tbl := &ast.Table{
+		Position: ast.Position{begin, end},
+		Line:     p.line,
+		Name:     last,
+		Type:     ast.TableTypeArray,
 	}
-	switch v := t.fieldMap[last].(type) {
+	switch v := t.Fields[last].(type) {
 	case nil:
-		if t.fieldMap == nil {
-			t.fieldMap = make(map[string]interface{})
+		if t.Fields == nil {
+			t.Fields = make(map[string]interface{})
 		}
-		t.fieldMap[last] = []*table{tbl}
-	case []*table:
-		t.fieldMap[last] = append(v, tbl)
-	case *keyValue:
-		p.Error(fmt.Errorf("key `%s' is in conflict with line %d", last, v.line))
+		t.Fields[last] = []*ast.Table{tbl}
+	case []*ast.Table:
+		t.Fields[last] = append(v, tbl)
+	case *ast.KeyValue:
+		p.Error(fmt.Errorf("key `%s' is in conflict with line %d", last, v.Line))
 	default:
 		p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", last, v))
 	}
@@ -538,23 +542,23 @@ func (p *toml) AddKeyValue() {
 		p.skip = false
 		return
 	}
-	if val, exists := p.currentTable.fieldMap[p.key]; exists {
+	if val, exists := p.currentTable.Fields[p.key]; exists {
 		switch v := val.(type) {
-		case *table:
-			p.Error(fmt.Errorf("key `%s' is in conflict with %v table in line %d", p.key, v.tableType, v.line))
-		case *keyValue:
-			p.Error(fmt.Errorf("key `%s' is in conflict with line %d", p.key, v.line))
+		case *ast.Table:
+			p.Error(fmt.Errorf("key `%s' is in conflict with %v table in line %d", p.key, v.Type, v.Line))
+		case *ast.KeyValue:
+			p.Error(fmt.Errorf("key `%s' is in conflict with line %d", p.key, v.Line))
 		default:
 			p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", p.key, v))
 		}
 	}
-	if p.currentTable.fieldMap == nil {
-		p.currentTable.fieldMap = make(map[string]interface{})
+	if p.currentTable.Fields == nil {
+		p.currentTable.Fields = make(map[string]interface{})
 	}
-	p.currentTable.fieldMap[p.key] = &keyValue{
-		key:   p.key,
-		value: p.val,
-		line:  p.line,
+	p.currentTable.Fields[p.key] = &ast.KeyValue{
+		Key:   p.key,
+		Value: p.val,
+		Line:  p.line,
 	}
 }
 
@@ -586,29 +590,29 @@ func (p *toml) unquote(s string) string {
 	return s
 }
 
-func (p *toml) lookupTable(t *table, keys []string) (*table, error) {
+func (p *toml) lookupTable(t *ast.Table, keys []string) (*ast.Table, error) {
 	for _, s := range keys {
-		val, exists := t.fieldMap[s]
+		val, exists := t.Fields[s]
 		if !exists {
-			tbl := &table{
-				name:      s,
-				line:      p.line,
-				tableType: tableTypeNormal,
+			tbl := &ast.Table{
+				Line: p.line,
+				Name: s,
+				Type: ast.TableTypeNormal,
 			}
-			if t.fieldMap == nil {
-				t.fieldMap = make(map[string]interface{})
+			if t.Fields == nil {
+				t.Fields = make(map[string]interface{})
 			}
-			t.fieldMap[s] = tbl
+			t.Fields[s] = tbl
 			t = tbl
 			continue
 		}
 		switch v := val.(type) {
-		case *table:
+		case *ast.Table:
 			t = v
-		case []*table:
+		case []*ast.Table:
 			t = v[len(v)-1]
-		case *keyValue:
-			return nil, fmt.Errorf("key `%s' is in conflict with line %d", s, v.line)
+		case *ast.KeyValue:
+			return nil, fmt.Errorf("key `%s' is in conflict with line %d", s, v.Line)
 		default:
 			return nil, fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", s, v)
 		}
@@ -644,37 +648,6 @@ type convertError struct {
 
 func (e convertError) Error() string {
 	return e.err.Error()
-}
-
-type tableType uint8
-
-const (
-	tableTypeNormal tableType = iota
-	tableTypeArray
-)
-
-var tableTypes = [...]string{
-	"normal",
-	"array",
-}
-
-func (t tableType) String() string {
-	return tableTypes[t]
-}
-
-type table struct {
-	name      string
-	fieldMap  map[string]interface{}
-	line      int
-	tableType tableType
-	begin     int
-	end       int
-}
-
-type keyValue struct {
-	key   string
-	value ast.Value
-	line  int
 }
 
 type array struct {

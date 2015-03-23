@@ -87,3 +87,41 @@ func (a *Array) Pos() int {
 func (a *Array) End() int {
 	return a.Position.End
 }
+
+type TableType uint8
+
+const (
+	TableTypeNormal TableType = iota
+	TableTypeArray
+)
+
+var tableTypes = [...]string{
+	"normal",
+	"array",
+}
+
+func (t TableType) String() string {
+	return tableTypes[t]
+}
+
+type Table struct {
+	Position Position
+	Line     int
+	Name     string
+	Fields   map[string]interface{}
+	Type     TableType
+}
+
+func (t *Table) Pos() int {
+	return t.Position.Begin
+}
+
+func (t *Table) End() int {
+	return t.Position.End
+}
+
+type KeyValue struct {
+	Key   string
+	Value Value
+	Line  int
+}
