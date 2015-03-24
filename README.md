@@ -1,6 +1,6 @@
-# TOML parser library for Golang [![Build Status](https://travis-ci.org/naoina/toml.png?branch=master)](https://travis-ci.org/naoina/toml)
+# TOML parser and encoder library for Golang [![Build Status](https://travis-ci.org/naoina/toml.png?branch=master)](https://travis-ci.org/naoina/toml)
 
-[TOML](https://github.com/toml-lang/toml) parser library for [Golang](http://golang.org/).
+[TOML](https://github.com/toml-lang/toml) parser and encoder library for [Golang](http://golang.org/).
 
 This library is compatible with TOML version [v0.4.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md).
 
