@@ -31,150 +31,150 @@ func mustTime(tm time.Time, err error) time.Time {
 	return tm
 }
 
-func TestUnmarshal(t *testing.T) {
-	type Name struct {
-		First string
-		Last  string
-	}
-	type Point struct {
-		X int
-		Y int
-	}
-	type Inline struct {
-		Name  Name
-		Point Point
-	}
-	type Subtable struct {
-		Key string
-	}
-	type Table struct {
-		Key      string
-		Subtable Subtable
-		Inline   Inline
-	}
-	type W struct {
-	}
-	type Z struct {
-		W W
-	}
-	type Y struct {
-		Z Z
-	}
-	type X struct {
-		Y Y
-	}
-	type Basic struct {
-		Basic string
-	}
-	type Continued struct {
-		Key1 string
-		Key2 string
-		Key3 string
-	}
-	type Multiline struct {
-		Key1      string
-		Key2      string
-		Key3      string
-		Continued Continued
-	}
-	type LiteralMultiline struct {
-		Regex2 string
-		Lines  string
-	}
-	type Literal struct {
-		Winpath   string
-		Winpath2  string
-		Quoted    string
-		Regex     string
-		Multiline LiteralMultiline
-	}
-	type String struct {
-		Basic     Basic
-		Multiline Multiline
-		Literal   Literal
-	}
-	type IntegerUnderscores struct {
-		Key1 int
-		Key2 int
-		Key3 int
-	}
-	type Integer struct {
-		Key1        int
-		Key2        int
-		Key3        int
-		Key4        int
-		Underscores IntegerUnderscores
-	}
-	type Fractional struct {
-		Key1 float64
-		Key2 float64
-		Key3 float64
-	}
-	type Exponent struct {
-		Key1 float64
-		Key2 float64
-		Key3 float64
-	}
-	type Both struct {
-		Key float64
-	}
-	type FloatUnderscores struct {
-		Key1 float64
-		Key2 float64
-	}
-	type Float struct {
-		Fractional  Fractional
-		Exponent    Exponent
-		Both        Both
-		Underscores FloatUnderscores
-	}
-	type Boolean struct {
-		True  bool
-		False bool
-	}
-	type Datetime struct {
-		Key1 time.Time
-		Key2 time.Time
-		Key3 time.Time
-	}
-	type Array struct {
-		Key1 []int
-		Key2 []string
-		Key3 [][]int
-		Key4 [][]interface{}
-		Key5 []int
-		Key6 []int
-	}
-	type Product struct {
-		Name  string
-		Sku   int64
-		Color string
-	}
-	type Physical struct {
-		Color string
-		Shape string
-	}
-	type Variety struct {
-		Name string
-	}
-	type Fruit struct {
-		Name     string
-		Physical Physical
-		Variety  []Variety
-	}
-	type testStruct struct {
-		Table    Table
-		X        X
-		String   String
-		Integer  Integer
-		Float    Float
-		Boolean  Boolean
-		Datetime Datetime
-		Array    Array
-		Products []Product
-		Fruit    []Fruit
-	}
+type Name struct {
+	First string
+	Last  string
+}
+type Point struct {
+	X int
+	Y int
+}
+type Inline struct {
+	Name  Name
+	Point Point
+}
+type Subtable struct {
+	Key string
+}
+type Table struct {
+	Key      string
+	Subtable Subtable
+	Inline   Inline
+}
+type W struct {
+}
+type Z struct {
+	W W
+}
+type Y struct {
+	Z Z
+}
+type X struct {
+	Y Y
+}
+type Basic struct {
+	Basic string
+}
+type Continued struct {
+	Key1 string
+	Key2 string
+	Key3 string
+}
+type Multiline struct {
+	Key1      string
+	Key2      string
+	Key3      string
+	Continued Continued
+}
+type LiteralMultiline struct {
+	Regex2 string
+	Lines  string
+}
+type Literal struct {
+	Winpath   string
+	Winpath2  string
+	Quoted    string
+	Regex     string
+	Multiline LiteralMultiline
+}
+type String struct {
+	Basic     Basic
+	Multiline Multiline
+	Literal   Literal
+}
+type IntegerUnderscores struct {
+	Key1 int
+	Key2 int
+	Key3 int
+}
+type Integer struct {
+	Key1        int
+	Key2        int
+	Key3        int
+	Key4        int
+	Underscores IntegerUnderscores
+}
+type Fractional struct {
+	Key1 float64
+	Key2 float64
+	Key3 float64
+}
+type Exponent struct {
+	Key1 float64
+	Key2 float64
+	Key3 float64
+}
+type Both struct {
+	Key float64
+}
+type FloatUnderscores struct {
+	Key1 float64
+	Key2 float64
+}
+type Float struct {
+	Fractional  Fractional
+	Exponent    Exponent
+	Both        Both
+	Underscores FloatUnderscores
+}
+type Boolean struct {
+	True  bool
+	False bool
+}
+type Datetime struct {
+	Key1 time.Time
+	Key2 time.Time
+	Key3 time.Time
+}
+type Array struct {
+	Key1 []int
+	Key2 []string
+	Key3 [][]int
+	Key4 [][]interface{}
+	Key5 []int
+	Key6 []int
+}
+type Product struct {
+	Name  string
+	Sku   int64
+	Color string
+}
+type Physical struct {
+	Color string
+	Shape string
+}
+type Variety struct {
+	Name string
+}
+type Fruit struct {
+	Name     string
+	Physical Physical
+	Variety  []Variety
+}
+type testStruct struct {
+	Table    Table
+	X        X
+	String   String
+	Integer  Integer
+	Float    Float
+	Boolean  Boolean
+	Datetime Datetime
+	Array    Array
+	Products []Product
+	Fruit    []Fruit
+}
 
+func TestUnmarshal(t *testing.T) {
 	data, err := loadTestData()
 	if err != nil {
 		t.Fatal(err)

@@ -44,7 +44,7 @@ func findField(rv reflect.Value, name string) (field reflect.Value, fieldName st
 			if !ast.IsExported(ft.Name) {
 				continue
 			}
-			if tag := ft.Tag.Get(fieldTagName); tag == name {
+			if col, _ := extractTag(ft.Tag.Get(fieldTagName)); col == name {
 				return rv.Field(i), ft.Name, true
 			}
 		}
@@ -61,4 +61,19 @@ func findField(rv reflect.Value, name string) (field reflect.Value, fieldName st
 		return reflect.New(rv.Type().Elem()).Elem(), name, true
 	}
 	return field, "", false
+}
+
+func extractTag(tag string) (col, rest string) {
+	tags := strings.SplitN(tag, ",", 2)
+	if len(tags) == 2 {
+		return strings.TrimSpace(tags[0]), strings.TrimSpace(tags[1])
+	}
+	return strings.TrimSpace(tags[0]), ""
+}
+
+func tableName(prefix, name string) string {
+	if prefix != "" {
+		return prefix + string(tableSeparator) + name
+	}
+	return name
 }
