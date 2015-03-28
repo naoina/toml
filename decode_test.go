@@ -1069,3 +1069,25 @@ key3 = "b"
 		}},
 	})
 }
+
+func TestUnmarshalMap(t *testing.T) {
+	data := `
+name = "evan"
+foo = 1
+`
+	m := map[string]interface{}{}
+
+	err := toml.Unmarshal([]byte(data), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if m["name"] != "evan" {
+		t.Fatal("map was not populated")
+	}
+
+	if m["foo"] != int64(1) {
+		t.Fatal("map was not populated")
+	}
+
+}
