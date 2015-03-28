@@ -1069,3 +1069,15 @@ key3 = "b"
 		}},
 	})
 }
+
+func TestUnmarshalMap(t *testing.T) {
+	testUnmarshal(t, []testcase{
+		{`
+name = "evan"
+foo = 1
+`, nil, map[string]interface{}{}, map[string]interface{}{
+			"name": "evan",
+			"foo":  int64(1),
+		}},
+	})
+}
