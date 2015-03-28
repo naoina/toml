@@ -99,6 +99,10 @@ func UnmarshalTable(t *ast.Table, v interface{}) (err error) {
 				if err := setValue(fv, av.Value); err != nil {
 					return fmt.Errorf("line %d: %v.%s: %v", av.Line, rv.Type(), fieldName, err)
 				}
+
+				if rv.Kind() == reflect.Map {
+					rv.SetMapIndex(reflect.ValueOf(fieldName), fv)
+				}
 			}
 		case *ast.Table:
 			fv, fieldName, found := findField(rv, key)
