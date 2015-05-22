@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+// UnmarshalFile parses the TOML data in file filename on disk and stores it in
+// the value pointed to by v
 func UnmarshalFile(filename string, v interface{}) error {
 	f, err := os.Open(filename)
 	if err != nil {
