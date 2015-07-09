@@ -106,6 +106,9 @@ func UnmarshalTable(t *ast.Table, v interface{}) (err error) {
 	for rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
 	}
+	if err, ok := setUnmarshaler(rv, string(t.Data)); ok {
+		return err
+	}
 	for key, val := range t.Fields {
 		switch av := val.(type) {
 		case *ast.KeyValue:
@@ -381,11 +384,12 @@ type toml struct {
 	skip         bool
 }
 
-func (p *toml) init() {
+func (p *toml) init(data []rune) {
 	p.line = 1
 	p.table = &ast.Table{
 		Line: p.line,
 		Type: ast.TableTypeNormal,
+		Data: data[:len(data)-1], // truncate the end_symbol added by PEG parse generator.
 	}
 	p.tableMap = map[string]*ast.Table{
 		"": p.table,

@@ -25,7 +25,7 @@ type parseState struct {
 
 func (d *parseState) init() {
 	d.p.Init()
-	d.p.toml.init()
+	d.p.toml.init(d.p.buffer)
 }
 
 func (d *parseState) parse() error {
