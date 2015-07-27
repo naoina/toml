@@ -67,7 +67,7 @@ func (e *Encoder) Encode(v interface{}) error {
 	return err
 }
 
-// Marshaler is the interface implemented by objects that can marshal themshelves into valid TOML.
+// Marshaler is the interface implemented by objects that can marshal themselves into valid TOML.
 type Marshaler interface {
 	MarshalTOML() ([]byte, error)
 }
