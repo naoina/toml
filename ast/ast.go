@@ -177,6 +177,10 @@ func (t *Table) Source() string {
 	return string(t.Data)
 }
 
+func (t *Table) IsDefined() bool {
+	return t.Position != Position{}
+}
+
 type KeyValue struct {
 	Key   string
 	Value Value

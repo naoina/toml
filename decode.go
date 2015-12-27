@@ -477,11 +477,39 @@ func (p *toml) setTable(t *ast.Table, buf []rune, begin, end int) {
 			p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.Type, t.Line))
 		}
 	}
-	t, err := p.lookupTable(t, names)
+	t, err := p.lookupTable(t, names[:len(names)-1])
 	if err != nil {
 		p.Error(err)
 	}
-	p.currentTable = t
+	last := names[len(names)-1]
+	var tbl *ast.Table
+	switch v := t.Fields[last].(type) {
+	case nil:
+		tbl = &ast.Table{
+			Position: ast.Position{begin, end},
+			Line:     p.line,
+			Name:     last,
+			Type:     ast.TableTypeNormal,
+		}
+	case *ast.Table:
+		if v.IsDefined() {
+			p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, v.Type, v.Line))
+		}
+		v.Position = ast.Position{begin, end}
+		v.Line = p.line
+		tbl = v
+	case []*ast.Table:
+		p.Error(fmt.Errorf("table `%s' was previously defined as array table", name))
+	case *ast.KeyValue:
+		p.Error(fmt.Errorf("key `%s' is in conflict with line %d", last, v.Line))
+	default:
+		p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", last, v))
+	}
+	if t.Fields == nil {
+		t.Fields = make(map[string]interface{})
+	}
+	t.Fields[last] = tbl
+	p.currentTable = tbl
 	p.tableMap[name] = p.currentTable
 }
 
