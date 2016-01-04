@@ -35,6 +35,9 @@ func TestMarshal(t *testing.T) {
 		{struct {
 			Name string `toml:",omitempty"`
 		}{""}, ""},
+		{struct {
+			Name map[string]string `toml:"name"`
+		}{map[string]string{"foo": "bar", "baz": "quux"}}, "[name]\nfoo=\"bar\"\nbaz=\"quux\"\n"},
 	} {
 		b, err := toml.Marshal(v.v)
 		var actual interface{} = err

@@ -158,6 +158,19 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 			return nil, err
 		}
 		return appendNewline(buf, inArray, arrayTable), nil
+	case reflect.Map:
+		name := tableName(prefix, name)
+		buf := append(append(append(buf, '['), name...), ']', '\n')
+
+		keys := fv.MapKeys()
+		var err error
+		for _, key := range keys {
+			buf, err = encodeValue(buf, prefix, key.String(), fv.MapIndex(key), inArray, arrayTable)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return buf, nil
 	}
 	return nil, fmt.Errorf("toml: marshal: unsupported type %v", fv.Kind())
 }
