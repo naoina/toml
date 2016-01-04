@@ -14,6 +14,7 @@ import (
 
 const (
 	tagOmitempty = "omitempty"
+	tagDocName   = "doc"
 	tagSkip      = "-"
 )
 
@@ -80,6 +81,8 @@ func marshal(buf []byte, prefix string, rv reflect.Value, inArray, arrayTable bo
 			continue
 		}
 		colName, rest := extractTag(rt.Field(i).Tag.Get(fieldTagName))
+		docStr := rt.Field(i).Tag.Get(tagDocName)
+
 		if colName == tagSkip {
 			continue
 		}
@@ -94,35 +97,35 @@ func marshal(buf []byte, prefix string, rv reflect.Value, inArray, arrayTable bo
 			}
 		}
 		var err error
-		if buf, err = encodeValue(buf, prefix, colName, fv, inArray, arrayTable); err != nil {
+		if buf, err = encodeValue(buf, prefix, colName, fv, inArray, arrayTable, docStr); err != nil {
 			return nil, err
 		}
 	}
 	return buf, nil
 }
 
-func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arrayTable bool) ([]byte, error) {
+func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arrayTable bool, doc string) ([]byte, error) {
 	switch t := fv.Interface().(type) {
 	case Marshaler:
 		b, err := t.MarshalTOML()
 		if err != nil {
 			return nil, err
 		}
-		return appendNewline(append(appendKey(buf, name, inArray, arrayTable), b...), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(append(appendKey(buf, name, inArray, arrayTable), b...), doc), inArray, arrayTable), nil
 	case time.Time:
-		return appendNewline(encodeTime(appendKey(buf, name, inArray, arrayTable), t), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(encodeTime(appendKey(buf, name, inArray, arrayTable), t), doc), inArray, arrayTable), nil
 	}
 	switch fv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return appendNewline(encodeInt(appendKey(buf, name, inArray, arrayTable), fv.Int()), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(encodeInt(appendKey(buf, name, inArray, arrayTable), fv.Int()), doc), inArray, arrayTable), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return appendNewline(encodeUint(appendKey(buf, name, inArray, arrayTable), fv.Uint()), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(encodeUint(appendKey(buf, name, inArray, arrayTable), fv.Uint()), doc), inArray, arrayTable), nil
 	case reflect.Float32, reflect.Float64:
-		return appendNewline(encodeFloat(appendKey(buf, name, inArray, arrayTable), fv.Float()), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(encodeFloat(appendKey(buf, name, inArray, arrayTable), fv.Float()), doc), inArray, arrayTable), nil
 	case reflect.Bool:
-		return appendNewline(encodeBool(appendKey(buf, name, inArray, arrayTable), fv.Bool()), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(encodeBool(appendKey(buf, name, inArray, arrayTable), fv.Bool()), doc), inArray, arrayTable), nil
 	case reflect.String:
-		return appendNewline(encodeString(appendKey(buf, name, inArray, arrayTable), fv.String()), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(encodeString(appendKey(buf, name, inArray, arrayTable), fv.String()), doc), inArray, arrayTable), nil
 	case reflect.Slice, reflect.Array:
 		ft := fv.Type().Elem()
 		for ft.Kind() == reflect.Ptr {
@@ -144,13 +147,16 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 			if i != 0 {
 				buf = append(buf, ',')
 			}
-			if buf, err = encodeValue(buf, prefix, name, fv.Index(i), true, false); err != nil {
+			if buf, err = encodeValue(buf, prefix, name, fv.Index(i), true, false, doc); err != nil {
 				return nil, err
 			}
 		}
-		return appendNewline(append(buf, ']'), inArray, arrayTable), nil
+		return appendNewline(appendDocInline(append(buf, ']'), doc), inArray, arrayTable), nil
 	case reflect.Struct:
 		name := tableName(prefix, name)
+		if doc != "" {
+			buf = appendNewline(appendDoc(buf, doc), false, false)
+		}
 		return marshal(append(append(append(buf, '['), name...), ']', '\n'), name, fv, inArray, arrayTable)
 	case reflect.Interface:
 		var err error
@@ -160,6 +166,18 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 		return appendNewline(buf, inArray, arrayTable), nil
 	}
 	return nil, fmt.Errorf("toml: marshal: unsupported type %v", fv.Kind())
+}
+
+func appendDocInline(buf []byte, doc string) []byte {
+	if doc != "" {
+		return append(append(append(append(buf, ' '), '#'), ' '), doc...)
+	} else {
+		return buf
+	}
+}
+
+func appendDoc(buf []byte, doc string) []byte {
+	return appendDocInline(buf, doc)[1:]
 }
 
 func appendKey(buf []byte, key string, inArray, arrayTable bool) []byte {
