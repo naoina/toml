@@ -9,6 +9,11 @@ import (
 )
 
 func TestMarshal(t *testing.T) {
+	type iceCreamPreference struct {
+		Flavor string
+		Scoops int
+	}
+
 	for _, v := range []struct {
 		v      interface{}
 		expect string
@@ -38,6 +43,9 @@ func TestMarshal(t *testing.T) {
 		{struct {
 			Name map[string]string `toml:"name"`
 		}{map[string]string{"foo": "bar", "baz": "quux"}}, "[name]\nfoo=\"bar\"\nbaz=\"quux\"\n"},
+		{struct {
+			Preferences map[string]iceCreamPreference `toml:"preferences"`
+		}{map[string]iceCreamPreference{"tim": iceCreamPreference{"Vanilla", 3}}}, "[preferences]\n[tim]\nflavor=\"Vanilla\"\nscoops=3\n"},
 	} {
 		b, err := toml.Marshal(v.v)
 		var actual interface{} = err

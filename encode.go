@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -163,6 +164,12 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 		buf := append(append(append(buf, '['), name...), ']', '\n')
 
 		keys := fv.MapKeys()
+		sortedKeys := make([]string, 0, len(keys))
+		for _, key := range keys {
+			sortedKeys = append(sortedKeys, key.String())
+		}
+		sort.Strings(sortedKeys)
+
 		var err error
 		for _, key := range keys {
 			buf, err = encodeValue(buf, prefix, key.String(), fv.MapIndex(key), inArray, arrayTable)
