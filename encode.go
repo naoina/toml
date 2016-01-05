@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -79,6 +80,9 @@ func marshal(buf []byte, prefix string, rv reflect.Value, inArray, arrayTable bo
 		rt = rv.Type()
 	}
 
+	tableBuf := make([]byte, 0)
+	valueBuf := make([]byte, 0)
+
 	for i := 0; i < rv.NumField(); i++ {
 		ft := rt.Field(i)
 		if !ast.IsExported(ft.Name) {
@@ -99,11 +103,18 @@ func marshal(buf []byte, prefix string, rv reflect.Value, inArray, arrayTable bo
 			}
 		}
 		var err error
-		if buf, err = encodeValue(buf, prefix, colName, fv, inArray, arrayTable); err != nil {
-			return nil, err
+		switch fv.Kind() {
+		case reflect.Struct, reflect.Map, reflect.Slice:
+			if tableBuf, err = encodeValue(tableBuf, prefix, colName, fv, inArray, arrayTable); err != nil {
+				return nil, err
+			}
+		default:
+			if valueBuf, err = encodeValue(valueBuf, prefix, colName, fv, inArray, arrayTable); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return buf, nil
+	return append(append(buf, valueBuf...), tableBuf...), nil
 }
 
 func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arrayTable bool) ([]byte, error) {
@@ -170,6 +181,25 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 		} else {
 			return encodeValue(buf, prefix, name, reflect.New(fv.Type().Elem()), inArray, arrayTable)
 		}
+	case reflect.Map:
+		name := tableName(prefix, name)
+		buf := append(append(append(buf, '['), name...), ']', '\n')
+
+		keys := fv.MapKeys()
+		sortedKeys := make([]string, 0, len(keys))
+		for _, key := range keys {
+			sortedKeys = append(sortedKeys, key.String())
+		}
+		sort.Strings(sortedKeys)
+
+		var err error
+		for _, key := range keys {
+			buf, err = encodeValue(buf, name, key.String(), fv.MapIndex(key), inArray, arrayTable)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return buf, nil
 	}
 	return nil, fmt.Errorf("toml: marshal: unsupported type %v", fv.Kind())
 }
