@@ -314,14 +314,27 @@ func TestMarshal_MixedStructMap(t *testing.T) {
 		Y int
 	}
 
+	type menuItem struct {
+		Name  string
+		Price int
+	}
+
 	type store struct {
 		StoreName string
 		Locations map[string]location
+		Cuisine   string
+		Menu      []menuItem
 	}
+
 	foo := store{
 		"Arby's",
 		map[string]location{
 			"Boston": location{1, 2},
+		},
+		"American",
+		[]menuItem{
+			menuItem{"Burger", 12},
+			menuItem{"Fries", 4},
 		},
 	}
 
@@ -331,10 +344,17 @@ func TestMarshal_MixedStructMap(t *testing.T) {
 	}
 
 	expect := `store_name="Arby's"
+cuisine="American"
 [locations]
 [locations.Boston]
 x=1
 y=2
+[[menu]]
+name="Burger"
+price=12
+[[menu]]
+name="Fries"
+price=4
 `
 
 	if string(str) != expect {
