@@ -46,6 +46,9 @@ func TestMarshal(t *testing.T) {
 		{struct {
 			Preferences map[string]iceCreamPreference `toml:"preferences"`
 		}{map[string]iceCreamPreference{"tim": iceCreamPreference{"Vanilla", 3}}}, "[preferences]\n[preferences.tim]\nflavor=\"Vanilla\"\nscoops=3\n"},
+		{struct {
+			Name string `toml:"name" doc:"The name of the person"`
+		}{"bob"}, "name=\"bob\" # The name of the person\n"},
 	} {
 		b, err := toml.Marshal(v.v)
 		var actual interface{} = err
