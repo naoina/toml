@@ -45,7 +45,7 @@ func TestMarshal(t *testing.T) {
 		}{map[string]string{"foo": "bar", "baz": "quux"}}, "[name]\nfoo=\"bar\"\nbaz=\"quux\"\n"},
 		{struct {
 			Preferences map[string]iceCreamPreference `toml:"preferences"`
-		}{map[string]iceCreamPreference{"tim": iceCreamPreference{"Vanilla", 3}}}, "[preferences]\n[tim]\nflavor=\"Vanilla\"\nscoops=3\n"},
+		}{map[string]iceCreamPreference{"tim": iceCreamPreference{"Vanilla", 3}}}, "[preferences]\n[preferences.tim]\nflavor=\"Vanilla\"\nscoops=3\n"},
 	} {
 		b, err := toml.Marshal(v.v)
 		var actual interface{} = err
@@ -305,5 +305,46 @@ name="plantain"
 		if !reflect.DeepEqual(actual, expect) {
 			t.Errorf(`Unmarshal after Marshal => %#v; want %#v`, v, actual, expect)
 		}
+	}
+}
+
+func TestMarshal_MixedStructMap(t *testing.T) {
+	type location struct {
+		X int
+		Y int
+	}
+
+	type store struct {
+		StoreName string
+		Locations map[string]location
+	}
+	foo := store{
+		"Arby's",
+		map[string]location{
+			"Boston": location{1, 2},
+		},
+	}
+
+	str, err := toml.Marshal(foo)
+	if err != nil {
+		t.Errorf(`Error marshalling example: %s`, err.Error())
+	}
+
+	expect := `store_name="Arby's"
+[locations]
+[locations.Boston]
+x=1
+y=2
+`
+
+	if string(str) != expect {
+		t.Errorf(`Marshal => %#v; want %#v`, string(str), expect)
+	}
+
+	var out store
+	toml.Unmarshal(str, &out)
+
+	if !reflect.DeepEqual(out, foo) {
+		t.Errorf(`Unmarshal => %#v; want %#v`, out, foo)
 	}
 }

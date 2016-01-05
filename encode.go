@@ -172,7 +172,7 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 
 		var err error
 		for _, key := range keys {
-			buf, err = encodeValue(buf, prefix, key.String(), fv.MapIndex(key), inArray, arrayTable)
+			buf, err = encodeValue(buf, name, key.String(), fv.MapIndex(key), inArray, arrayTable)
 			if err != nil {
 				return nil, err
 			}
