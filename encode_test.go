@@ -42,7 +42,7 @@ func TestMarshal(t *testing.T) {
 		}{""}, ""},
 		{struct {
 			Name map[string]string `toml:"name"`
-		}{map[string]string{"foo": "bar", "baz": "quux"}}, "[name]\nfoo=\"bar\"\nbaz=\"quux\"\n"},
+		}{map[string]string{"foo": "bar", "baz": "quux"}}, "[name]\nbaz=\"quux\"\nfoo=\"bar\"\n"},
 		{struct {
 			Preferences map[string]iceCreamPreference `toml:"preferences"`
 		}{map[string]iceCreamPreference{"tim": iceCreamPreference{"Vanilla", 3}}}, "[preferences]\n[preferences.tim]\nflavor=\"Vanilla\"\nscoops=3\n"},

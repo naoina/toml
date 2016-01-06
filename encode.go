@@ -194,13 +194,20 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 		keys := fv.MapKeys()
 		sortedKeys := make([]string, 0, len(keys))
 		for _, key := range keys {
-			sortedKeys = append(sortedKeys, key.String())
+			var keyStr string
+			switch key.Interface().(type) {
+			case fmt.Stringer:
+				keyStr = key.String()
+			case string:
+				keyStr = key.Interface().(string)
+			}
+			sortedKeys = append(sortedKeys, keyStr)
 		}
 		sort.Strings(sortedKeys)
 
 		var err error
-		for _, key := range keys {
-			buf, err = encodeValue(buf, name, key.String(), fv.MapIndex(key), inArray, arrayTable, doc)
+		for _, key := range sortedKeys {
+			buf, err = encodeValue(buf, name, key, fv.MapIndex(reflect.ValueOf(key)), inArray, arrayTable, doc)
 			if err != nil {
 				return nil, err
 			}
