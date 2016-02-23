@@ -238,7 +238,7 @@ type element struct {
 /* ${@} bit structure for abstract syntax tree */
 type token16 struct {
 	pegRule
-	begin, end, next int16
+	begin, end, next int32
 }
 
 func (t *token16) isZero() bool {
@@ -299,7 +299,7 @@ func (t *tokens16) Order() [][]token16 {
 
 	for i, token := range t.tree {
 		depth := token.next
-		token.next = int16(i)
+		token.next = int32(i)
 		ordered[depth][depths[depth]] = token
 		depths[depth]++
 	}
@@ -341,7 +341,7 @@ func (t *tokens16) PreOrder() (<-chan state16, [][]token16) {
 		depths, state, depth := make([]int16, len(ordered)), 0, 1
 		write := func(t token16, leaf bool) {
 			S := states[state]
-			state, S.pegRule, S.begin, S.end, S.next, S.leaf = (state+1)%8, t.pegRule, t.begin, t.end, int16(depth), leaf
+			state, S.pegRule, S.begin, S.end, S.next, S.leaf = (state+1)%8, t.pegRule, t.begin, t.end, int32(depth), leaf
 			copy(S.depths, depths)
 			s <- S
 		}
@@ -456,7 +456,7 @@ func (t *tokens16) PrintSyntaxTree(buffer string) {
 }
 
 func (t *tokens16) Add(rule pegRule, begin, end, depth, index int) {
-	t.tree[index] = token16{pegRule: rule, begin: int16(begin), end: int16(end), next: int16(depth)}
+	t.tree[index] = token16{pegRule: rule, begin: int32(begin), end: int32(end), next: int32(depth)}
 }
 
 func (t *tokens16) Tokens() <-chan token32 {
