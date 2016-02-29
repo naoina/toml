@@ -1,4 +1,4 @@
-# TOML parser and encoder library for Golang [![Build Status](https://travis-ci.org/naoina/toml.png?branch=master)](https://travis-ci.org/naoina/toml)
+# TOML parser and encoder library for Golang [![Build Status](https://travis-ci.org/influxdata/toml.png?branch=master)](https://travis-ci.org/influxdata/toml)
 
 [TOML](https://github.com/toml-lang/toml) parser and encoder library for [Golang](http://golang.org/).
 
@@ -6,7 +6,7 @@ This library is compatible with TOML version [v0.4.0](https://github.com/toml-la
 
 ## Installation
 
-    go get -u github.com/naoina/toml
+    go get -u github.com/influxdata/toml
 
 ## Usage
 
@@ -58,7 +58,7 @@ import (
     "os"
     "time"
 
-    "github.com/naoina/toml"
+    "github.com/influxdata/toml"
 )
 
 type tomlConfig struct {
@@ -357,7 +357,7 @@ func (d *Duration) UnmarshalTOML(data []byte) error {
 
 ## API documentation
 
-See [Godoc](http://godoc.org/github.com/naoina/toml).
+See [Godoc](http://godoc.org/github.com/influxdata/toml).
 
 ## License
 
