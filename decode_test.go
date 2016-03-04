@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/naoina/toml"
+	"github.com/influxdata/toml"
 )
 
 const (
