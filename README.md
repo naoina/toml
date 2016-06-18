@@ -355,7 +355,7 @@ type Duration struct {
 func (d *Duration) UnmarshalTOML(data []byte) error {
         n, err := time.ParseDuration(strings.Trim(string(data), "\""))
         d.Duration = n
-	return err
+        return err
 }
 ```
 
