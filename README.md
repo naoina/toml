@@ -339,7 +339,10 @@ duration = "10s"
 ```
 
 ```go
-import time
+import (
+    "time"
+    "strings"
+)
 
 type Config struct {
 	Duration Duration
@@ -350,7 +353,8 @@ type Duration struct {
 }
 
 func (d *Duration) UnmarshalTOML(data []byte) error {
-	d.Duration, err := time.ParseDuration(string(data))
+        n, err := time.ParseDuration(strings.Trim(string(data), "\""))
+        d.Duration = n
 	return err
 }
 ```
