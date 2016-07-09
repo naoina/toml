@@ -89,7 +89,7 @@ func marshal(buf []byte, prefix string, rv reflect.Value, inArray, arrayTable bo
 		fv := rv.Field(i)
 		switch rest {
 		case tagOmitempty:
-			if fv.Interface() == reflect.Zero(ft.Type).Interface() {
+			if reflect.DeepEqual(fv.Interface(), reflect.Zero(ft.Type).Interface()) {
 				continue
 			}
 		}
