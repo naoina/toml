@@ -6,6 +6,7 @@ This library is compatible with TOML version [v0.4.0](https://github.com/toml-la
 
 ## Installation
 
+    go get -u github.com/pointlander/peg
     go get -u github.com/naoina/toml
 
 ## Usage
