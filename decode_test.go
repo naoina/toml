@@ -1,6 +1,7 @@
 package toml_test
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -172,6 +173,19 @@ type testStruct struct {
 	Array    Array
 	Products []Product
 	Fruit    []Fruit
+}
+
+// Values of this type will be set to the data that UnmarshalText is called with.
+type implementsTextUnmarshaler string
+
+var errTextUnmarshaler = errors.New("UnmarshalText called with data = error")
+
+func (x *implementsTextUnmarshaler) UnmarshalText(data []byte) error {
+	*x = implementsTextUnmarshaler(data)
+	if *x == "error" {
+		return errTextUnmarshaler
+	}
+	return nil
 }
 
 func TestUnmarshal(t *testing.T) {
@@ -999,6 +1013,52 @@ author = "Lewis Carroll"
 	}
 	if !reflect.DeepEqual(actual, expect) {
 		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, actual, expect)
+	}
+}
+
+func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
+	type testStruct struct {
+		Str        implementsTextUnmarshaler
+		Int        implementsTextUnmarshaler
+		Float      implementsTextUnmarshaler
+		Arraytable []testStruct
+	}
+	data := `str = "str"
+int = 11
+float = 12.0
+[[arraytable]]
+str = "str2"
+int = 22
+float = 23.0
+`
+	var v testStruct
+	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+		t.Fatal(err)
+	}
+	expect := testStruct{
+		Str:        "str",
+		Int:        "11",
+		Float:      "12.0",
+		Arraytable: []testStruct{{Str: "str2", Int: "22", Float: "23.0"}},
+	}
+	if !reflect.DeepEqual(v, expect) {
+		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, v, expect)
+	}
+}
+
+func TestUnmarshal_WithTextUnmarshalerError(t *testing.T) {
+	type testStruct struct {
+		Str implementsTextUnmarshaler
+	}
+	data := `str = "error"`
+	var v testStruct
+	err := toml.Unmarshal([]byte(data), &v)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	expect := fmt.Sprintf("toml: unmarshal: line 1: toml_test.testStruct.Str: %v", errTextUnmarshaler)
+	if err.Error() != expect {
+		t.Fatalf("got error %q, want %q", err, expect)
 	}
 }
 
