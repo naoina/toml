@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"encoding"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -233,12 +234,35 @@ func setUnmarshaler(lhs reflect.Value, data string) (error, bool) {
 	return nil, false
 }
 
+func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
+	if !lhs.CanAddr() {
+		return nil, false
+	}
+	u, ok := lhs.Addr().Interface().(encoding.TextUnmarshaler)
+	if !ok {
+		return nil, false
+	}
+	var data string
+	switch val := val.(type) {
+	case *ast.Array:
+		return fmt.Errorf("cannot use array for %v", lhs.Type()), true
+	case *ast.String:
+		data = val.Value
+	default:
+		data = val.Source()
+	}
+	return u.UnmarshalText([]byte(data)), true
+}
+
 func setValue(lhs reflect.Value, val ast.Value) error {
 	for lhs.Kind() == reflect.Ptr {
 		lhs.Set(reflect.New(lhs.Type().Elem()))
 		lhs = lhs.Elem()
 	}
 	if err, ok := setUnmarshaler(lhs, val.Source()); ok {
+		return err
+	}
+	if err, ok := setTextUnmarshaler(lhs, val); ok {
 		return err
 	}
 	switch v := val.(type) {
@@ -259,9 +283,7 @@ func setValue(lhs reflect.Value, val ast.Value) error {
 			return err
 		}
 	case *ast.Datetime:
-		if err := setDatetime(lhs, v); err != nil {
-			return err
-		}
+		panic("*ast.Datetime should be handled by TextUnmarshaler")
 	case *ast.Array:
 		if err := setArray(lhs, v); err != nil {
 			return err
@@ -320,14 +342,6 @@ func setBoolean(fv reflect.Value, v *ast.Boolean) error {
 		return err
 	}
 	return set(fv, b)
-}
-
-func setDatetime(fv reflect.Value, v *ast.Datetime) error {
-	tm, err := v.Time()
-	if err != nil {
-		return err
-	}
-	return set(fv, tm)
 }
 
 func setArray(fv reflect.Value, v *ast.Array) error {

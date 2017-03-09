@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"encoding"
 	"fmt"
 	"io"
 	"reflect"
@@ -109,8 +110,12 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 			return nil, err
 		}
 		return appendNewline(append(appendKey(buf, name, inArray, arrayTable), b...), inArray, arrayTable), nil
-	case time.Time:
-		return appendNewline(encodeTime(appendKey(buf, name, inArray, arrayTable), t), inArray, arrayTable), nil
+	case encoding.TextMarshaler:
+		b, err := t.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		return appendNewline(encodeTextMarshaler(appendKey(buf, name, inArray, arrayTable), string(b)), inArray, arrayTable), nil
 	}
 	switch fv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -230,6 +235,18 @@ func encodeString(buf []byte, s string) []byte {
 	return strconv.AppendQuote(buf, s)
 }
 
-func encodeTime(buf []byte, t time.Time) []byte {
-	return append(buf, t.Format(time.RFC3339Nano)...)
+func encodeTextMarshaler(buf []byte, v string) []byte {
+	// Emit the value without quotes if possible.
+	if v == "true" || v == "false" {
+		return append(buf, v...)
+	} else if _, err := time.Parse(time.RFC3339Nano, v); err == nil {
+		return append(buf, v...)
+	} else if _, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return append(buf, v...)
+	} else if _, err := strconv.ParseUint(v, 10, 64); err == nil {
+		return append(buf, v...)
+	} else if _, err := strconv.ParseFloat(v, 64); err == nil {
+		return append(buf, v...)
+	}
+	return strconv.AppendQuote(buf, v)
 }
