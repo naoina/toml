@@ -848,7 +848,7 @@ func (p *tomlParser) Execute() {
 		case ruleAction5:
 			p.SetKey(p.buffer, begin, end)
 		case ruleAction6:
-			p.SetKey(p.buffer, begin, end)
+			p.SetKey(p.buffer, begin-1, end+1)
 		case ruleAction7:
 			p.SetTime(begin, end)
 		case ruleAction8:

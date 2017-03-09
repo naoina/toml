@@ -1121,3 +1121,23 @@ foo = 1
 		}},
 	})
 }
+
+func TestUnmarshal_WithQuotedKeyValue(t *testing.T) {
+	type nestedStruct struct {
+		Truthy bool
+	}
+	type testStruct struct {
+		Table map[string]nestedStruct
+	}
+
+	testUnmarshal(t, []testcase{
+		{`
+[table]
+"some.key" = {truthy = true}
+`, nil, &testStruct{},
+			&testStruct{Table: map[string]nestedStruct{
+				"some.key": {Truthy: true},
+			}},
+		},
+	})
+}
