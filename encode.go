@@ -75,6 +75,11 @@ type Marshaler interface {
 
 func marshal(buf []byte, prefix string, rv reflect.Value, inArray, arrayTable bool) ([]byte, error) {
 	rt := rv.Type()
+	for rt.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+		rt = rv.Type()
+	}
+
 	for i := 0; i < rv.NumField(); i++ {
 		ft := rt.Field(i)
 		if !ast.IsExported(ft.Name) {
@@ -163,6 +168,13 @@ func encodeValue(buf []byte, prefix, name string, fv reflect.Value, inArray, arr
 			return nil, err
 		}
 		return appendNewline(buf, inArray, arrayTable), nil
+	case reflect.Ptr:
+		newElem := fv.Elem()
+		if newElem.IsValid() {
+			return encodeValue(buf, prefix, name, newElem, inArray, arrayTable)
+		} else {
+			return encodeValue(buf, prefix, name, reflect.New(fv.Type().Elem()), inArray, arrayTable)
+		}
 	}
 	return nil, fmt.Errorf("toml: marshal: unsupported type %v", fv.Kind())
 }

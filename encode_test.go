@@ -296,3 +296,35 @@ name="plantain"
 		}
 	}
 }
+
+func TestMarshalPointer(t *testing.T) {
+	type Profession struct {
+		Name       string
+		Department string
+	}
+
+	foo := struct {
+		Active     bool
+		Name       string
+		Occupation *Profession
+	}{
+		true,
+		"Foo Bar",
+		&Profession{"Professor", "CS"},
+	}
+
+	expect := `active=true
+name="Foo Bar"
+[occupation]
+name="Professor"
+department="CS"
+`
+	actual, err := toml.Marshal(&foo)
+	if err != nil {
+		t.Errorf(`Unable to marshal pointer, err was %s`, err.Error())
+	}
+
+	if !reflect.DeepEqual(string(actual), expect) {
+		t.Errorf(`Marshal(%#v); v => %#v; want %#v`, foo, string(actual), expect)
+	}
+}
