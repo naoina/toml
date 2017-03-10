@@ -1,10 +1,8 @@
-package toml_test
+package toml
 
 import (
 	"testing"
 	"time"
-
-	"github.com/naoina/toml"
 )
 
 func BenchmarkUnmarshal(b *testing.B) {
@@ -42,7 +40,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 		b.Fatal(err)
 	}
 	for i := 0; i < b.N; i++ {
-		if err := toml.Unmarshal(data, &v); err != nil {
+		if err := Unmarshal(data, &v); err != nil {
 			b.Fatal(err)
 		}
 	}

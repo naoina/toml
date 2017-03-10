@@ -1,11 +1,9 @@
-package toml_test
+package toml
 
 import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/naoina/toml"
 )
 
 func TestMarshal(t *testing.T) {
@@ -36,7 +34,7 @@ func TestMarshal(t *testing.T) {
 			Name string `toml:",omitempty"`
 		}{""}, ""},
 	} {
-		b, err := toml.Marshal(v.v)
+		b, err := Marshal(v.v)
 		var actual interface{} = err
 		var expect interface{} = nil
 		if !reflect.DeepEqual(actual, expect) {
@@ -270,7 +268,7 @@ name="plantain"
 `,
 		},
 	} {
-		b, err := toml.Marshal(v.v)
+		b, err := Marshal(v.v)
 		var actual interface{} = err
 		var expect interface{} = nil
 		if !reflect.DeepEqual(actual, expect) {
@@ -284,7 +282,7 @@ name="plantain"
 
 		// test for reversible.
 		dest := testStruct{}
-		actual = toml.Unmarshal(b, &dest)
+		actual = Unmarshal(b, &dest)
 		expect = nil
 		if !reflect.DeepEqual(actual, expect) {
 			t.Errorf(`Unmarshal after Marshal => %#v; want %#v`, actual, expect)
@@ -319,7 +317,7 @@ name="Foo Bar"
 name="Professor"
 department="CS"
 `
-	actual, err := toml.Marshal(&foo)
+	actual, err := Marshal(&foo)
 	if err != nil {
 		t.Errorf(`Unable to marshal pointer, err was %s`, err.Error())
 	}

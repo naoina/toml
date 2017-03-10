@@ -1,4 +1,4 @@
-package toml_test
+package toml
 
 import (
 	"errors"
@@ -8,8 +8,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/naoina/toml"
 )
 
 const (
@@ -194,7 +192,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v testStruct
-	var actual interface{} = toml.Unmarshal(data, &v)
+	var actual interface{} = Unmarshal(data, &v)
 	var expect interface{} = nil
 	if !reflect.DeepEqual(actual, expect) {
 		t.Errorf(`toml.Unmarshal(data, &testStruct{}) => %#v; want %#v`, actual, expect)
@@ -330,7 +328,7 @@ type testcase struct {
 
 func testUnmarshal(t *testing.T, testcases []testcase) {
 	for _, v := range testcases {
-		var actual error = toml.Unmarshal([]byte(v.data), v.actual)
+		var actual error = Unmarshal([]byte(v.data), v.actual)
 		var expect error = v.err
 		if !reflect.DeepEqual(actual, expect) {
 			t.Errorf(`toml.Unmarshal([]byte(%#v), %#v) => %#v; want %#v`, v.data, nil, actual, expect)
@@ -430,10 +428,10 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = -2147483649`, nil, &testStruct{}, &testStruct{-2147483649}},
 		{`intval = 9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
 		{`intval = +9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
-		{`intval = 9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
-		{`intval = +9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "+9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = 9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml.testStruct.Intval: strconv.ParseInt: parsing "9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = +9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml.testStruct.Intval: strconv.ParseInt: parsing "+9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = -9223372036854775808`, nil, &testStruct{}, &testStruct{-9223372036854775808}},
-		{`intval = -9223372036854775809`, fmt.Errorf(`toml: unmarshal: line 1: toml_test.testStruct.Intval: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
+		{`intval = -9223372036854775809`, fmt.Errorf(`toml: unmarshal: line 1: toml.testStruct.Intval: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = 1_000`, nil, &testStruct{}, &testStruct{1000}},
 		{`intval = 5_349_221`, nil, &testStruct{}, &testStruct{5349221}},
 		{`intval = 1_2_3_4_5`, nil, &testStruct{}, &testStruct{12345}},
@@ -993,7 +991,7 @@ title = "Alice's Adventures in Wonderland"
 author = "Lewis Carroll"
 `
 	var v testStruct
-	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+	if err := Unmarshal([]byte(data), &v); err != nil {
 		t.Fatal(err)
 	}
 	actual := v
@@ -1032,7 +1030,7 @@ int = 22
 float = 23.0
 `
 	var v testStruct
-	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+	if err := Unmarshal([]byte(data), &v); err != nil {
 		t.Fatal(err)
 	}
 	expect := testStruct{
@@ -1052,11 +1050,11 @@ func TestUnmarshal_WithTextUnmarshalerError(t *testing.T) {
 	}
 	data := `str = "error"`
 	var v testStruct
-	err := toml.Unmarshal([]byte(data), &v)
+	err := Unmarshal([]byte(data), &v)
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	expect := fmt.Sprintf("toml: unmarshal: line 1: toml_test.testStruct.Str: %v", errTextUnmarshaler)
+	expect := fmt.Sprintf("toml: unmarshal: line 1: toml.testStruct.Str: %v", errTextUnmarshaler)
 	if err.Error() != expect {
 		t.Fatalf("got error %q, want %q", err, expect)
 	}
@@ -1067,7 +1065,7 @@ func TestUnmarshal_WithUnmarshalerForTopLevelStruct(t *testing.T) {
 author = "Lewis Carroll"
 `
 	var v testUnmarshalStruct
-	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+	if err := Unmarshal([]byte(data), &v); err != nil {
 		t.Fatal(err)
 	}
 	actual := v
@@ -1091,7 +1089,7 @@ func TestUnmarshal_WithMultibyteString(t *testing.T) {
 	data := `name = "七一〇七"
 numbers = ["壱", "弐", "参"]
 `
-	if err := toml.Unmarshal([]byte(data), &v); err != nil {
+	if err := Unmarshal([]byte(data), &v); err != nil {
 		t.Fatal(err)
 	}
 	actual := v
