@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/kylelemons/godebug/pretty"
 )
 
 func loadTestData(file string) []byte {
@@ -283,19 +285,6 @@ func theTestStruct() testStruct {
 	}
 }
 
-// Values of this type will be set to the data that UnmarshalText is called with.
-type implementsTextUnmarshaler string
-
-var errTextUnmarshaler = errors.New("UnmarshalText called with data = error")
-
-func (x *implementsTextUnmarshaler) UnmarshalText(data []byte) error {
-	*x = implementsTextUnmarshaler(data)
-	if *x == "error" {
-		return errTextUnmarshaler
-	}
-	return nil
-}
-
 func TestUnmarshal(t *testing.T) {
 	data := loadTestData("test.toml")
 
@@ -322,13 +311,12 @@ type testcase struct {
 
 func testUnmarshal(t *testing.T, testcases []testcase) {
 	for _, v := range testcases {
-		var actual error = Unmarshal([]byte(v.data), v.actual)
-		var expect error = v.err
-		if !reflect.DeepEqual(actual, expect) {
-			t.Errorf(`toml.Unmarshal([]byte(%#v), %#v) => %#v; want %#v`, v.data, nil, actual, expect)
+		err := Unmarshal([]byte(v.data), v.actual)
+		if !reflect.DeepEqual(err, v.err) {
+			t.Errorf("Error mismatch for input:\n%s\ngot: %+v\nwant: %+v", v.data, err, v.err)
 		}
 		if !reflect.DeepEqual(v.actual, v.expect) {
-			t.Errorf(`toml.Unmarshal([]byte(%#v), v); v => %#v; want %#v`, v.data, v.actual, v.expect)
+			t.Errorf("Unmarshal value mismatch for input:\n%s\ndiff:\n%s", v.data, pretty.Compare(v.actual, v.expect))
 		}
 	}
 }
@@ -422,15 +410,32 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = -2147483649`, nil, &testStruct{}, &testStruct{-2147483649}},
 		{`intval = 9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
 		{`intval = +9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
-		{`intval = 9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml.testStruct.Intval: strconv.ParseInt: parsing "9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
-		{`intval = +9223372036854775808`, fmt.Errorf(`toml: unmarshal: line 1: toml.testStruct.Intval: strconv.ParseInt: parsing "+9223372036854775808": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = -9223372036854775808`, nil, &testStruct{}, &testStruct{-9223372036854775808}},
-		{`intval = -9223372036854775809`, fmt.Errorf(`toml: unmarshal: line 1: toml.testStruct.Intval: strconv.ParseInt: parsing "-9223372036854775809": value out of range`), &testStruct{}, &testStruct{}},
 		{`intval = 1_000`, nil, &testStruct{}, &testStruct{1000}},
 		{`intval = 5_349_221`, nil, &testStruct{}, &testStruct{5349221}},
 		{`intval = 1_2_3_4_5`, nil, &testStruct{}, &testStruct{12345}},
-		{`intval = _1_000`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{`intval = 1_000_`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
+		// overflow
+		{
+			data:   `intval = 9223372036854775808`,
+			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "9223372036854775808"}),
+			actual: &testStruct{},
+			expect: &testStruct{},
+		},
+		{
+			data:   `intval = +9223372036854775808`,
+			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "+9223372036854775808"}),
+			actual: &testStruct{},
+			expect: &testStruct{},
+		},
+		{
+			data:   `intval = -9223372036854775809`,
+			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "-9223372036854775809"}),
+			actual: &testStruct{},
+			expect: &testStruct{},
+		},
+		// invalid _
+		{`intval = _1_000`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`intval = 1_000_`, lineError(1, errParse), &testStruct{}, &testStruct{}},
 	})
 }
 
@@ -470,8 +475,8 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{}, &testStruct{9224617.445991228313}},
 		{`floatval = 1e1_00`, nil, &testStruct{}, &testStruct{1e100}},
 		{`floatval = 1e02`, nil, &testStruct{}, &testStruct{1e2}},
-		{`floatval = _1e1_00`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{`floatval = 1e1_00_`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
+		{`floatval = _1e1_00`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`floatval = 1e1_00_`, lineError(1, errParse), &testStruct{}, &testStruct{}},
 	})
 }
 
@@ -579,7 +584,12 @@ func TestUnmarshal_WithArray(t *testing.T) {
 					[]interface{}{int64(5), int64(6)},
 				},
 			}},
-		{`arrayval = [ 1, 2.0 ] # note: this is NOT ok`, fmt.Errorf("toml: unmarshal: line 1: struct { Arrayval []interface {} }.Arrayval: array cannot contain multiple types"), &struct{ Arrayval []interface{} }{}, &struct{ Arrayval []interface{} }{}},
+		{
+			data:   `arrayval = [ 1, 2.0 ] # note: this is NOT ok`,
+			err:    lineErrorField(1, "struct { Arrayval []interface {} }.Arrayval", errArrayMultiType),
+			actual: &struct{ Arrayval []interface{} }{},
+			expect: &struct{ Arrayval []interface{} }{},
+		},
 		{`key = [
   1, 2, 3
 ]`, nil, &struct{ Key []int }{},
@@ -738,27 +748,27 @@ d = 2`, nil, &testStruct{},
 b = 1
 
 [a]
-c = 2`, fmt.Errorf("toml: line 6: table `a' is in conflict with normal table in line 3"), &testStruct{}, &testStruct{}},
+c = 2`, lineError(6, fmt.Errorf("table `a' is in conflict with normal table in line 3")), &testStruct{}, &testStruct{}},
 		{`# DO NOT DO THIS EITHER
 
 [a]
 b = 1
 
 [a.b]
-c = 2`, fmt.Errorf("toml: line 6: key `b' is in conflict with line 4"), &testStruct{}, &testStruct{}},
+c = 2`, lineError(6, fmt.Errorf("key `b' is in conflict with line 4")), &testStruct{}, &testStruct{}},
 		{`# DO NOT DO THIS EITHER
 
 [a.b]
 c = 2
 
 [a]
-b = 1`, fmt.Errorf("toml: line 7: key `b' is in conflict with normal table in line 3"), &testStruct{}, &testStruct{}},
-		{`[]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{`[a.]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{`[a..b]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{`[.b]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{`[.]`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
-		{` = "no key name" # not allowed`, fmt.Errorf("toml: line 1: parse error"), &testStruct{}, &testStruct{}},
+b = 1`, lineError(7, fmt.Errorf("key `b' is in conflict with normal table in line 3")), &testStruct{}, &testStruct{}},
+		{`[]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`[a.]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`[a..b]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`[.b]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`[.]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{` = "no key name" # not allowed`, lineError(1, errParse), &testStruct{}, &testStruct{}},
 		{`[servers]
 [servers.alpha]
 ip = "10.0.0.1"
@@ -929,7 +939,7 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 
 		# This table conflicts with the previous table
 		[fruit.variety]
-		name = "granny smith"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with array table in line 5"), &testStruct{}, &testStruct{}},
+		name = "granny smith"`, lineError(9, fmt.Errorf("table `fruit.variety' is in conflict with array table in line 5")), &testStruct{}, &testStruct{}},
 		{`# INVALID TOML DOC
 		[[fruit]]
 		name = "apple"
@@ -939,64 +949,51 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 
 		# This table conflicts with the previous table
 		[[fruit.variety]]
-		name = "red delicious"`, fmt.Errorf("toml: line 9: table `fruit.variety' is in conflict with normal table in line 5"), &testStruct{}, &testStruct{}},
+		name = "red delicious"`, lineError(9, fmt.Errorf("table `fruit.variety' is in conflict with normal table in line 5")), &testStruct{}, &testStruct{}},
 	})
 }
 
-type UnmarshalString string
+type testUnmarshalerString string
 
-func (u *UnmarshalString) UnmarshalTOML(data []byte) error {
-	*u = UnmarshalString("UnmarshalString: " + string(data))
+func (u *testUnmarshalerString) UnmarshalTOML(data []byte) error {
+	*u = testUnmarshalerString("Unmarshaled: " + string(data))
 	return nil
 }
 
-type testUnmarshalStruct struct {
+type testUnmarshalerStruct struct {
 	Title  string
-	Author UnmarshalString
+	Author testUnmarshalerString
 }
 
-func (u *testUnmarshalStruct) UnmarshalTOML(data []byte) error {
+func (u *testUnmarshalerStruct) UnmarshalTOML(data []byte) error {
 	u.Title = "Unmarshaled: " + string(data)
 	return nil
 }
 
 func TestUnmarshal_WithUnmarshaler(t *testing.T) {
 	type testStruct struct {
-		Title         UnmarshalString
-		MaxConn       UnmarshalString
-		Ports         UnmarshalString
-		Servers       UnmarshalString
-		Table         UnmarshalString
-		Arraytable    UnmarshalString
-		ArrayOfStruct []testUnmarshalStruct
+		Title         testUnmarshalerString
+		MaxConn       testUnmarshalerString
+		Ports         testUnmarshalerString
+		Servers       testUnmarshalerString
+		Table         testUnmarshalerString
+		Arraytable    testUnmarshalerString
+		ArrayOfStruct []testUnmarshalerStruct
 	}
-	data := `title = "testtitle"
-max_conn = 777
-ports = [8080, 8081, 8082]
-servers = [1, 2, 3]
-[table]
-name = "alice"
-[[arraytable]]
-name = "alice"
-[[arraytable]]
-name = "bob"
-[[array_of_struct]]
-title = "Alice's Adventures in Wonderland"
-author = "Lewis Carroll"
-`
+	data := loadTestData("unmarshal-unmarshaler.toml")
 	var v testStruct
-	if err := Unmarshal([]byte(data), &v); err != nil {
+	if err := Unmarshal(data, &v); err != nil {
 		t.Fatal(err)
 	}
 	actual := v
 	expect := testStruct{
-		Title:      `UnmarshalString: "testtitle"`,
-		MaxConn:    `UnmarshalString: 777`,
-		Ports:      `UnmarshalString: [8080, 8081, 8082]`,
-		Servers:    `UnmarshalString: [1, 2, 3]`,
-		Table:      "UnmarshalString: [table]\nname = \"alice\"",
-		Arraytable: "UnmarshalString: [[arraytable]]\nname = \"alice\"\n[[arraytable]]\nname = \"bob\"",
-		ArrayOfStruct: []testUnmarshalStruct{
+		Title:      `Unmarshaled: "testtitle"`,
+		MaxConn:    `Unmarshaled: 777`,
+		Ports:      `Unmarshaled: [8080, 8081, 8082]`,
+		Servers:    `Unmarshaled: [1, 2, 3]`,
+		Table:      "Unmarshaled: [table]\nname = \"alice\"",
+		Arraytable: "Unmarshaled: [[arraytable]]\nname = \"alice\"\n[[arraytable]]\nname = \"bob\"",
+		ArrayOfStruct: []testUnmarshalerStruct{
 			{
 				Title:  "Unmarshaled: [[array_of_struct]]\ntitle = \"Alice's Adventures in Wonderland\"\nauthor = \"Lewis Carroll\"",
 				Author: "",
@@ -1008,62 +1005,16 @@ author = "Lewis Carroll"
 	}
 }
 
-func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
-	type testStruct struct {
-		Str        implementsTextUnmarshaler
-		Int        implementsTextUnmarshaler
-		Float      implementsTextUnmarshaler
-		Arraytable []testStruct
-	}
-	data := `str = "str"
-int = 11
-float = 12.0
-[[arraytable]]
-str = "str2"
-int = 22
-float = 23.0
-`
-	var v testStruct
-	if err := Unmarshal([]byte(data), &v); err != nil {
-		t.Fatal(err)
-	}
-	expect := testStruct{
-		Str:        "str",
-		Int:        "11",
-		Float:      "12.0",
-		Arraytable: []testStruct{{Str: "str2", Int: "22", Float: "23.0"}},
-	}
-	if !reflect.DeepEqual(v, expect) {
-		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, v, expect)
-	}
-}
-
-func TestUnmarshal_WithTextUnmarshalerError(t *testing.T) {
-	type testStruct struct {
-		Str implementsTextUnmarshaler
-	}
-	data := `str = "error"`
-	var v testStruct
-	err := Unmarshal([]byte(data), &v)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	expect := fmt.Sprintf("toml: unmarshal: line 1: toml.testStruct.Str: %v", errTextUnmarshaler)
-	if err.Error() != expect {
-		t.Fatalf("got error %q, want %q", err, expect)
-	}
-}
-
 func TestUnmarshal_WithUnmarshalerForTopLevelStruct(t *testing.T) {
 	data := `title = "Alice's Adventures in Wonderland"
 author = "Lewis Carroll"
 `
-	var v testUnmarshalStruct
+	var v testUnmarshalerStruct
 	if err := Unmarshal([]byte(data), &v); err != nil {
 		t.Fatal(err)
 	}
 	actual := v
-	expect := testUnmarshalStruct{
+	expect := testUnmarshalerStruct{
 		Title: `Unmarshaled: title = "Alice's Adventures in Wonderland"
 author = "Lewis Carroll"
 `,
@@ -1071,6 +1022,97 @@ author = "Lewis Carroll"
 	}
 	if !reflect.DeepEqual(actual, expect) {
 		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, actual, expect)
+	}
+}
+
+type testTextUnmarshaler string
+
+var errTextUnmarshaler = errors.New("UnmarshalText called with data = error")
+
+func (x *testTextUnmarshaler) UnmarshalText(data []byte) error {
+	*x = testTextUnmarshaler("Unmarshaled: " + string(data))
+	if string(data) == "error" {
+		return errTextUnmarshaler
+	}
+	return nil
+}
+
+func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
+	type testStruct struct {
+		Str        testTextUnmarshaler
+		Int        testTextUnmarshaler
+		Float      testTextUnmarshaler
+		Arraytable []testStruct
+	}
+
+	tests := []testcase{
+		{
+			data:   string(loadTestData("unmarshal-textunmarshaler.toml")),
+			actual: &testStruct{},
+			expect: &testStruct{
+				Str:        "Unmarshaled: str",
+				Int:        "Unmarshaled: 11",
+				Float:      "Unmarshaled: 12.0",
+				Arraytable: []testStruct{{Str: "Unmarshaled: str2", Int: "Unmarshaled: 22", Float: "Unmarshaled: 23.0"}},
+			},
+		},
+		{
+			data:   `str = "error"`,
+			actual: &testStruct{},
+			expect: &testStruct{Str: "Unmarshaled: error"},
+			err:    lineErrorField(1, "toml.testStruct.Str", errTextUnmarshaler),
+		},
+	}
+	testUnmarshal(t, tests)
+}
+
+type testUnmarshalerRecString string
+
+func (u *testUnmarshalerRecString) UnmarshalTOML(fn func(interface{}) error) error {
+	var s string
+	if err := fn(&s); err != nil {
+		return err
+	}
+	*u = testUnmarshalerRecString("Unmarshaled: " + s)
+	return nil
+}
+
+type testUnmarshalerRecStruct struct {
+	a, b int
+}
+
+func (u *testUnmarshalerRecStruct) UnmarshalTOML(fn func(interface{}) error) error {
+	var uu struct{ A, B int }
+	if err := fn(&uu); err != nil {
+		return err
+	}
+	u.a, u.b = uu.A, uu.B
+	return nil
+}
+
+func TestUnmarshal_WithUnmarshalerRec(t *testing.T) {
+	type testStruct struct {
+		String     testUnmarshalerRecString
+		Struct     testUnmarshalerRecStruct
+		Arraytable []testStruct
+	}
+	var v testStruct
+	err := Unmarshal(loadTestData("unmarshal-unmarshalerrec.toml"), &v)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+	expect := testStruct{
+		String: "Unmarshaled: str1",
+		Struct: testUnmarshalerRecStruct{a: 1, b: 2},
+		Arraytable: []testStruct{
+			{
+				String: "Unmarshaled: str2",
+				Struct: testUnmarshalerRecStruct{a: 3, b: 4},
+			},
+		},
+	}
+	if !reflect.DeepEqual(v, expect) {
+		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, v, expect)
 	}
 }
 
@@ -1164,13 +1206,21 @@ key3 = "b"
 
 func TestUnmarshalMap(t *testing.T) {
 	testUnmarshal(t, []testcase{
-		{`
+		{
+			data: `
 name = "evan"
 foo = 1
-`, nil, map[string]interface{}{}, map[string]interface{}{
-			"name": "evan",
-			"foo":  int64(1),
-		}},
+`,
+			actual: map[string]interface{}{},
+			expect: map[string]interface{}{"name": "evan", "foo": int64(1)},
+		},
+		{
+			data: `[p]
+first = "evan"
+`,
+			actual: map[string]*Name{},
+			expect: map[string]*Name{"p": {First: "evan"}},
+		},
 	})
 }
 
@@ -1191,5 +1241,27 @@ func TestUnmarshal_WithQuotedKeyValue(t *testing.T) {
 				"some.key": {Truthy: true},
 			}},
 		},
+	})
+}
+
+func TestUnmarshal_WithCustomPrimitiveType(t *testing.T) {
+	type (
+		String string
+		Int    int
+		Bool   bool
+	)
+	type X struct {
+		S String
+		I Int
+		B Bool
+	}
+
+	input := `
+s = "string"
+i = 1
+b = true
+`
+	testUnmarshal(t, []testcase{
+		{input, nil, &X{}, &X{"string", 1, true}},
 	})
 }

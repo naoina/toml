@@ -332,7 +332,11 @@ type Config struct {
 }
 ```
 
-### Using `toml.UnmarshalTOML` interface
+### Using the `encoding.TextUnmarshaler` interface
+
+Package toml supports `encoding.TextUnmarshaler` (and `encoding.TextMarshaler`). You can
+use it to apply custom marshaling rules for certain types. The `UnmarshalText` method is
+called with the value text found in the TOML input. TOML strings are passed unquoted.
 
 ```toml
 duration = "10s"
@@ -341,19 +345,45 @@ duration = "10s"
 ```go
 import time
 
-type Config struct {
-	Duration Duration
+type Duration time.Duration
+
+// UnmarshalText implements encoding.TextUnmarshaler
+func (d *Duration) UnmarshalText(data []byte) error {
+    duration, err := time.ParseDuration(string(data))
+    if err == nil {
+        *d = Duration(duration)
+    }
+    return err
 }
 
-type Duration struct {
-	time.Duration
+// MarshalText implements encoding.TextMarshaler
+func (d Duration) MarshalText() ([]byte, error) {
+    return []byte(time.Duration(d).String()), nil
 }
 
-func (d *Duration) UnmarshalTOML(data []byte) error {
-	d.Duration, err := time.ParseDuration(string(data))
-	return err
+type ConfigWithDuration struct {
+    Duration Duration
 }
 ```
+### Using the `toml.UnmarshalerRec` interface
+
+You can also override marshaling rules specifically for TOML using the `UnmarshalerRec`
+and `MarshalerRec` interfaces. These are useful if you want to control how structs or
+arrays are handled. You can apply additional validation or set unexported struct fields.
+
+Note: `encoding.TextUnmarshaler` and `encoding.TextMarshaler` should be preferred for
+simple (scalar) values because they're also compatible with other formats like JSON or
+YAML.
+
+[See the UnmarshalerRec example](https://godoc.org/github.com/naoina/toml/#example_UnmarshalerRec).
+
+### Using the `toml.Unmarshaler` interface
+
+If you want to deal with raw TOML syntax, use the `Unmarshaler` and `Marshaler`
+interfaces. Their input and output is raw TOML syntax. As such, these interfaces are
+useful if you want to handle TOML at the syntax level.
+
+[See the Unmarshaler example](https://godoc.org/github.com/naoina/toml/#example_Unmarshaler).
 
 ## API documentation
 

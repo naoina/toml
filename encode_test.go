@@ -28,6 +28,18 @@ func (t *testMarshalerPtr) MarshalTOML() ([]byte, error) {
 	return []byte(t.S), nil
 }
 
+type testMarshalerRec struct{ replacement interface{} }
+
+type testMarshalerRecPtr struct{ replacement interface{} }
+
+func (t testMarshalerRec) MarshalTOML() (interface{}, error) {
+	return t.replacement, nil
+}
+
+func (t *testMarshalerRecPtr) MarshalTOML() (interface{}, error) {
+	return t.replacement, nil
+}
+
 var marshalTests = []struct {
 	v      interface{}
 	expect []byte
@@ -115,7 +127,7 @@ var marshalTests = []struct {
 		},
 		expect: loadTestData("marshal-funkymapkeys.toml"),
 	},
-	// marshaler:
+	// Marshaler:
 	{
 		v: map[string]interface{}{
 			"m1": testMarshaler{"1"},
@@ -123,6 +135,18 @@ var marshalTests = []struct {
 			"m3": &testMarshalerPtr{"3"},
 		},
 		expect: loadTestData("marshal-marshaler.toml"),
+	},
+	// MarshalerRec:
+	{
+		v: map[string]interface{}{
+			"m1": testMarshalerRec{1},
+			"m2": &testMarshalerRec{2},
+			"m3": &testMarshalerRecPtr{3},
+			"sub": &testMarshalerRec{map[string]interface{}{
+				"key": 1,
+			}},
+		},
+		expect: loadTestData("marshal-marshalerrec.toml"),
 	},
 	// key escaping:
 	{

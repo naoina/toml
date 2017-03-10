@@ -35,29 +35,24 @@ const (
 )
 
 func findField(rv reflect.Value, name string) (field reflect.Value, fieldName string, found bool) {
-	switch rv.Kind() {
-	case reflect.Struct:
-		rt := rv.Type()
-		for i := 0; i < rt.NumField(); i++ {
-			ft := rt.Field(i)
-			if ft.PkgPath != "" && !ft.Anonymous {
-				continue
-			}
-			if col, _ := extractTag(ft.Tag.Get(fieldTagName)); col == name {
-				return rv.Field(i), ft.Name, true
-			}
+	rt := rv.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		ft := rt.Field(i)
+		if ft.PkgPath != "" && !ft.Anonymous {
+			continue
 		}
-		for _, name := range []string{
-			strings.Title(name),
-			toCamelCase(name),
-			strings.ToUpper(name),
-		} {
-			if field := rv.FieldByName(name); field.IsValid() {
-				return field, name, true
-			}
+		if col, _ := extractTag(ft.Tag.Get(fieldTagName)); col == name {
+			return rv.Field(i), ft.Name, true
 		}
-	case reflect.Map:
-		return reflect.New(rv.Type().Elem()).Elem(), name, true
+	}
+	for _, name := range []string{
+		strings.Title(name),
+		toCamelCase(name),
+		strings.ToUpper(name),
+	} {
+		if field := rv.FieldByName(name); field.IsValid() {
+			return field, name, true
+		}
 	}
 	return field, "", false
 }

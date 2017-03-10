@@ -47,7 +47,7 @@ func Unmarshal(data []byte, v interface{}) error {
 		return err
 	}
 	if err := UnmarshalTable(table, v); err != nil {
-		return fmt.Errorf("toml: unmarshal: %v", err)
+		return err
 	}
 	return nil
 }
@@ -75,13 +75,24 @@ func (d *Decoder) Decode(v interface{}) error {
 	return Unmarshal(b, v)
 }
 
-// Unmarshaler is the interface implemented by objects that can unmarshal a
-// TOML description of themselves.
-// The input can be assumed to be a valid encoding of a TOML value.
-// UnmarshalJSON must copy the TOML data if it wishes to retain the data after
-// returning.
+// UnmarshalerRec may be implemented by types to customize their behavior when being
+// unmarshaled from TOML. You can use it to implement custom validation or to set
+// unexported fields.
+//
+// UnmarshalTOML receives a function that can be called to unmarshal the original TOML
+// value into a field or variable. It is safe to call the function more than once if
+// necessary.
+type UnmarshalerRec interface {
+	UnmarshalTOML(fn func(interface{}) error) error
+}
+
+// Unmarshaler can be used to capture and process raw TOML source of a table or value.
+// UnmarshalTOML must copy the input if it wishes to retain it after returning.
+//
+// Note: this interface is retained for backwards compatibility. You probably want
+// to implement encoding.TextUnmarshaler or UnmarshalerRec instead.
 type Unmarshaler interface {
-	UnmarshalTOML([]byte) error
+	UnmarshalTOML(input []byte) error
 }
 
 // UnmarshalTable applies the contents of an ast.Table to the value pointed at by v.
@@ -96,142 +107,174 @@ type Unmarshaler interface {
 //	TOML arrays to any type of slice or []interface{}
 //	TOML tables to struct
 //	TOML array of tables to slice of struct
-func UnmarshalTable(t *ast.Table, v interface{}) (err error) {
-	if v == nil {
-		return fmt.Errorf("v must not be nil")
-	}
+func UnmarshalTable(t *ast.Table, v interface{}) error {
 	rv := reflect.ValueOf(v)
-	if kind := rv.Kind(); kind != reflect.Ptr && kind != reflect.Map {
-		return fmt.Errorf("v must be a pointer or map")
+	toplevelMap := rv.Kind() == reflect.Map
+	if (!toplevelMap && rv.Kind() != reflect.Ptr) || rv.IsNil() {
+		return &invalidUnmarshalError{reflect.TypeOf(v)}
 	}
-	for rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
+	return unmarshalTable(rv, t, toplevelMap)
+}
+
+// used for UnmarshalerRec.
+func unmarshalTableOrValue(rv reflect.Value, av interface{}) error {
+	if (rv.Kind() != reflect.Ptr && rv.Kind() != reflect.Map) || rv.IsNil() {
+		return &invalidUnmarshalError{rv.Type()}
 	}
-	if err, ok := setUnmarshaler(rv, string(t.Data)); ok {
-		return err
+	rv = indirect(rv)
+
+	switch av.(type) {
+	case *ast.KeyValue, *ast.Table, []*ast.Table:
+		return unmarshalField(rv, av)
+	case ast.Value:
+		return setValue(rv, av.(ast.Value))
+	default:
+		panic(fmt.Sprintf("BUG: unhandled AST node type %T", av))
 	}
-	for key, val := range t.Fields {
-		switch av := val.(type) {
-		case *ast.KeyValue:
+}
+
+// unmarshalTable unmarshals the fields of a table into a struct or map.
+//
+// toplevelMap is true when rv is an (unadressable) map given to UnmarshalTable. In this
+// (special) case, the map is used as-is instead of creating a new map.
+func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
+	rv = indirect(rv)
+	if err, ok := setUnmarshaler(rv, t); ok {
+		return lineError(t.Line, err)
+	}
+	switch rv.Kind() {
+	case reflect.Struct:
+		for key, astVal := range t.Fields {
 			fv, fieldName, found := findField(rv, key)
 			if !found {
-				return fmt.Errorf("line %d: field corresponding to `%s' is not defined in `%T'", av.Line, key, v)
+				return lineError(t.Line, fmt.Errorf("field corresponding to `%s' is not defined in %v", fieldName, rv.Type()))
 			}
-			switch fv.Kind() {
-			case reflect.Map:
-				mv := reflect.New(fv.Type().Elem()).Elem()
-				if err := UnmarshalTable(t, mv.Addr().Interface()); err != nil {
-					return err
-				}
-				fv.SetMapIndex(reflect.ValueOf(fieldName), mv)
-			default:
-				if err := setValue(fv, av.Value); err != nil {
-					return fmt.Errorf("line %d: %v.%s: %v", av.Line, rv.Type(), fieldName, err)
-				}
-				if rv.Kind() == reflect.Map {
-					rv.SetMapIndex(reflect.ValueOf(fieldName), fv)
-				}
+			if err := unmarshalField(fv, astVal); err != nil {
+				return lineErrorField(t.Line, rv.Type().String()+"."+fieldName, err)
 			}
-		case *ast.Table:
-			fv, fieldName, found := findField(rv, key)
-			if !found {
-				return fmt.Errorf("line %d: field corresponding to `%s' is not defined in `%T'", av.Line, key, v)
-			}
-			if err, ok := setUnmarshaler(fv, string(av.Data)); ok {
-				if err != nil {
-					return err
-				}
-				continue
-			}
-			for fv.Kind() == reflect.Ptr {
-				fv.Set(reflect.New(fv.Type().Elem()))
-				fv = fv.Elem()
-			}
-			switch fv.Kind() {
-			case reflect.Struct:
-				vv := reflect.New(fv.Type()).Elem()
-				if err := UnmarshalTable(av, vv.Addr().Interface()); err != nil {
-					return err
-				}
-				fv.Set(vv)
-				if rv.Kind() == reflect.Map {
-					rv.SetMapIndex(reflect.ValueOf(fieldName), fv)
-				}
-			case reflect.Map:
-				mv := reflect.MakeMap(fv.Type())
-				if err := UnmarshalTable(av, mv.Interface()); err != nil {
-					return err
-				}
-				fv.Set(mv)
-			default:
-				return fmt.Errorf("line %d: `%v.%s' must be struct or map, but %v given", av.Line, rv.Type(), fieldName, fv.Kind())
-			}
-		case []*ast.Table:
-			fv, fieldName, found := findField(rv, key)
-			if !found {
-				return fmt.Errorf("line %d: field corresponding to `%s' is not defined in `%T'", av[0].Line, key, v)
-			}
-			data := make([]string, 0, len(av))
-			for _, tbl := range av {
-				data = append(data, string(tbl.Data))
-			}
-			if err, ok := setUnmarshaler(fv, strings.Join(data, "\n")); ok {
-				if err != nil {
-					return err
-				}
-				continue
-			}
-			t := fv.Type().Elem()
-			pc := 0
-			for ; t.Kind() == reflect.Ptr; pc++ {
-				t = t.Elem()
-			}
-			if fv.Kind() != reflect.Slice {
-				return fmt.Errorf("line %d: `%v.%s' must be slice type, but %v given", av[0].Line, rv.Type(), fieldName, fv.Kind())
-			}
-			for _, tbl := range av {
-				var vv reflect.Value
-				switch t.Kind() {
-				case reflect.Map:
-					vv = reflect.MakeMap(t)
-					if err := UnmarshalTable(tbl, vv.Interface()); err != nil {
-						return err
-					}
-				default:
-					vv = reflect.New(t).Elem()
-					if err := UnmarshalTable(tbl, vv.Addr().Interface()); err != nil {
-						return err
-					}
-				}
-				for i := 0; i < pc; i++ {
-					vv = vv.Addr()
-					pv := reflect.New(vv.Type()).Elem()
-					pv.Set(vv)
-					vv = pv
-				}
-				fv.Set(reflect.Append(fv, vv))
-			}
-			if rv.Kind() == reflect.Map {
-				rv.SetMapIndex(reflect.ValueOf(fieldName), fv)
-			}
-		default:
-			return fmt.Errorf("BUG: unknown type `%T'", t)
 		}
+	case reflect.Map: // TODO: reflect.Interface
+		m := rv
+		if !toplevelMap {
+			m = reflect.MakeMap(rv.Type())
+		}
+		elemtyp := rv.Type().Elem()
+		for key, astVal := range t.Fields {
+			fv := reflect.New(elemtyp).Elem()
+			if err := unmarshalField(fv, astVal); err != nil {
+				return lineError(t.Line, err)
+			}
+			m.SetMapIndex(reflect.ValueOf(key), fv)
+		}
+		if !toplevelMap {
+			rv.Set(m)
+		}
+	default:
+		return lineError(t.Line, &unmarshalTypeError{"table", "struct or map", rv.Type()})
 	}
 	return nil
 }
 
-func setUnmarshaler(lhs reflect.Value, data string) (error, bool) {
-	for lhs.Kind() == reflect.Ptr {
-		lhs.Set(reflect.New(lhs.Type().Elem()))
-		lhs = lhs.Elem()
+func unmarshalField(rv reflect.Value, fieldAst interface{}) error {
+	switch av := fieldAst.(type) {
+	case *ast.KeyValue:
+		err := setValue(rv, av.Value)
+		if err != nil {
+			err = lineError(av.Line, err)
+		}
+		return err
+	case *ast.Table:
+		return unmarshalTable(rv, av, false)
+	case []*ast.Table:
+		rv = indirect(rv)
+		if err, ok := setUnmarshaler(rv, fieldAst); ok {
+			return err
+		}
+		if rv.Kind() != reflect.Slice {
+			return lineError(av[0].Line, &unmarshalTypeError{"array table", "slice", rv.Type()})
+		}
+		slice := reflect.MakeSlice(rv.Type(), len(av), len(av))
+		for i, tbl := range av {
+			vv := reflect.New(rv.Type().Elem()).Elem()
+			if err := unmarshalTable(vv, tbl, false); err != nil {
+				return err
+			}
+			slice.Index(i).Set(vv)
+		}
+		rv.Set(slice)
+	default:
+		panic(fmt.Sprintf("BUG: unhandled AST node type %T", av))
 	}
+	return nil
+}
+
+func setValue(lhs reflect.Value, val ast.Value) error {
+	lhs = indirect(lhs)
+	if err, ok := setUnmarshaler(lhs, val); ok {
+		return err
+	}
+	if err, ok := setTextUnmarshaler(lhs, val); ok {
+		return err
+	}
+	switch v := val.(type) {
+	case *ast.Integer:
+		return setInt(lhs, v)
+	case *ast.Float:
+		return setFloat(lhs, v)
+	case *ast.String:
+		return setString(lhs, v)
+	case *ast.Boolean:
+		return setBoolean(lhs, v)
+	case *ast.Array:
+		return setArray(lhs, v)
+	case *ast.Datetime:
+		panic("*ast.Datetime should be handled by TextUnmarshaler")
+	default:
+		panic(fmt.Sprintf("BUG: unhandled node type %T", v))
+	}
+}
+
+func indirect(rv reflect.Value) reflect.Value {
+	for rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			rv.Set(reflect.New(rv.Type().Elem()))
+		}
+		rv = rv.Elem()
+	}
+	return rv
+}
+
+func setUnmarshaler(lhs reflect.Value, av interface{}) (error, bool) {
 	if lhs.CanAddr() {
+		if u, ok := lhs.Addr().Interface().(UnmarshalerRec); ok {
+			err := u.UnmarshalTOML(func(v interface{}) error {
+				return unmarshalTableOrValue(reflect.ValueOf(v), av)
+			})
+			return err, true
+		}
 		if u, ok := lhs.Addr().Interface().(Unmarshaler); ok {
-			return u.UnmarshalTOML([]byte(data)), true
+			return u.UnmarshalTOML(unmarshalerSource(av)), true
 		}
 	}
 	return nil, false
+}
+
+func unmarshalerSource(av interface{}) []byte {
+	var source []byte
+	switch av := av.(type) {
+	case []*ast.Table:
+		for i, tab := range av {
+			source = append(source, tab.Source()...)
+			if i != len(av)-1 {
+				source = append(source, '\n')
+			}
+		}
+	case ast.Value:
+		source = []byte(av.Source())
+	default:
+		panic(fmt.Sprintf("BUG: unhandled node type %T", av))
+	}
+	return source
 }
 
 func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
@@ -245,7 +288,7 @@ func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
 	var data string
 	switch val := val.(type) {
 	case *ast.Array:
-		return fmt.Errorf("cannot use array for %v", lhs.Type()), true
+		return &unmarshalTypeError{"array", "", lhs.Type()}, true
 	case *ast.String:
 		data = val.Value
 	default:
@@ -254,61 +297,28 @@ func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
 	return u.UnmarshalText([]byte(data)), true
 }
 
-func setValue(lhs reflect.Value, val ast.Value) error {
-	for lhs.Kind() == reflect.Ptr {
-		lhs.Set(reflect.New(lhs.Type().Elem()))
-		lhs = lhs.Elem()
-	}
-	if err, ok := setUnmarshaler(lhs, val.Source()); ok {
-		return err
-	}
-	if err, ok := setTextUnmarshaler(lhs, val); ok {
-		return err
-	}
-	switch v := val.(type) {
-	case *ast.Integer:
-		if err := setInt(lhs, v); err != nil {
-			return err
-		}
-	case *ast.Float:
-		if err := setFloat(lhs, v); err != nil {
-			return err
-		}
-	case *ast.String:
-		if err := setString(lhs, v); err != nil {
-			return err
-		}
-	case *ast.Boolean:
-		if err := setBoolean(lhs, v); err != nil {
-			return err
-		}
-	case *ast.Datetime:
-		panic("*ast.Datetime should be handled by TextUnmarshaler")
-	case *ast.Array:
-		if err := setArray(lhs, v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func setInt(fv reflect.Value, v *ast.Integer) error {
-	i, err := v.Int()
-	if err != nil {
-		return err
-	}
 	switch fv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if fv.OverflowInt(i) {
-			return &errorOutOfRange{fv.Kind(), i}
+		i, err := strconv.ParseInt(v.Value, 10, int(fv.Type().Size()*8))
+		if err != nil {
+			return convertNumError(fv.Kind(), err)
 		}
 		fv.SetInt(i)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		fv.SetUint(uint64(i))
+		i, err := strconv.ParseUint(v.Value, 10, int(fv.Type().Size()*8))
+		if err != nil {
+			return convertNumError(fv.Kind(), err)
+		}
+		fv.SetUint(i)
 	case reflect.Interface:
+		i, err := strconv.ParseInt(v.Value, 10, 64)
+		if err != nil {
+			return convertNumError(reflect.Int64, err)
+		}
 		fv.Set(reflect.ValueOf(i))
 	default:
-		return fmt.Errorf("`%v' is not any types of int", fv.Type())
+		return &unmarshalTypeError{"integer", "", fv.Type()}
 	}
 	return nil
 }
@@ -321,62 +331,78 @@ func setFloat(fv reflect.Value, v *ast.Float) error {
 	switch fv.Kind() {
 	case reflect.Float32, reflect.Float64:
 		if fv.OverflowFloat(f) {
-			return &errorOutOfRange{fv.Kind(), f}
+			return &overflowError{fv.Kind(), v.Value}
 		}
 		fv.SetFloat(f)
 	case reflect.Interface:
 		fv.Set(reflect.ValueOf(f))
 	default:
-		return fmt.Errorf("`%v' is not float32 or float64", fv.Type())
+		return &unmarshalTypeError{"float", "", fv.Type()}
 	}
 	return nil
 }
 
 func setString(fv reflect.Value, v *ast.String) error {
-	return set(fv, v.Value)
+	switch fv.Kind() {
+	case reflect.String:
+		fv.SetString(v.Value)
+		return nil
+	case reflect.Interface:
+		// TODO: need non-empty interface check here
+		fv.Set(reflect.ValueOf(v.Value))
+		return nil
+	default:
+		return &unmarshalTypeError{"string", "", fv.Type()}
+	}
 }
 
 func setBoolean(fv reflect.Value, v *ast.Boolean) error {
-	b, err := v.Boolean()
-	if err != nil {
-		return err
+	b, _ := v.Boolean()
+	switch fv.Kind() {
+	case reflect.Bool:
+		fv.SetBool(b)
+		return nil
+	case reflect.Interface:
+		// TODO: need non-empty interface check here
+		fv.Set(reflect.ValueOf(b))
+		return nil
+	default:
+		return &unmarshalTypeError{"boolean", "", fv.Type()}
 	}
-	return set(fv, b)
 }
 
-func setArray(fv reflect.Value, v *ast.Array) error {
+func setArray(rv reflect.Value, v *ast.Array) error {
 	if len(v.Value) == 0 {
 		return nil
 	}
-	typ := reflect.TypeOf(v.Value[0])
+	tomltyp := reflect.TypeOf(v.Value[0])
 	for _, vv := range v.Value[1:] {
-		if typ != reflect.TypeOf(vv) {
-			return fmt.Errorf("array cannot contain multiple types")
+		if tomltyp != reflect.TypeOf(vv) {
+			return errArrayMultiType
 		}
 	}
-	sliceType := fv.Type()
-	if fv.Kind() == reflect.Interface {
-		sliceType = reflect.SliceOf(sliceType)
+
+	var slicetyp reflect.Type
+	switch rv.Kind() {
+	case reflect.Slice:
+		slicetyp = rv.Type()
+	case reflect.Interface:
+		// TODO: need non-empty interface check here
+		slicetyp = reflect.SliceOf(rv.Type())
+	default:
+		return &unmarshalTypeError{"array", "slice", rv.Type()}
 	}
-	slice := reflect.MakeSlice(sliceType, 0, len(v.Value))
-	t := sliceType.Elem()
-	for _, vv := range v.Value {
-		tmp := reflect.New(t).Elem()
+
+	slice := reflect.MakeSlice(slicetyp, len(v.Value), len(v.Value))
+	typ := slicetyp.Elem()
+	for i, vv := range v.Value {
+		tmp := reflect.New(typ).Elem()
 		if err := setValue(tmp, vv); err != nil {
 			return err
 		}
-		slice = reflect.Append(slice, tmp)
+		slice.Index(i).Set(tmp)
 	}
-	fv.Set(slice)
-	return nil
-}
-
-func set(fv reflect.Value, v interface{}) error {
-	rhs := reflect.ValueOf(v)
-	if !rhs.Type().AssignableTo(fv.Type()) {
-		return fmt.Errorf("`%v' type is not assignable to `%v' type", rhs.Type(), fv.Type())
-	}
-	fv.Set(rhs)
+	rv.Set(slice)
 	return nil
 }
 
@@ -412,7 +438,7 @@ func (p *toml) init(data []rune) {
 }
 
 func (p *toml) Error(err error) {
-	panic(convertError{fmt.Errorf("toml: line %d: %v", p.line, err)})
+	panic(lineError(p.line, err))
 }
 
 func (p *tomlParser) SetTime(begin, end int) {
@@ -674,14 +700,6 @@ func splitTableKey(tk string) []string {
 	}
 	keys = append(keys, string(key))
 	return keys
-}
-
-type convertError struct {
-	err error
-}
-
-func (e convertError) Error() string {
-	return e.err.Error()
 }
 
 type array struct {

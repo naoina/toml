@@ -1,7 +1,7 @@
 package toml
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/naoina/toml/ast"
 )
@@ -12,6 +12,8 @@ import (
 //     go generate .
 
 //go:generate peg -switch -inline parse.peg
+
+var errParse = errors.New("parse error")
 
 // Parse returns an AST representation of TOML.
 // The toplevel is represented by a table.
@@ -38,7 +40,7 @@ func (d *parseState) init() {
 func (d *parseState) parse() error {
 	if err := d.p.Parse(); err != nil {
 		if err, ok := err.(*parseError); ok {
-			return fmt.Errorf("toml: line %d: parse error", err.Line())
+			return lineError(err.Line(), errParse)
 		}
 		return err
 	}
@@ -47,15 +49,29 @@ func (d *parseState) parse() error {
 
 func (d *parseState) execute() (err error) {
 	defer func() {
-		e := recover()
-		if e != nil {
-			cerr, ok := e.(convertError)
+		if e := recover(); e != nil {
+			lerr, ok := e.(*LineError)
 			if !ok {
 				panic(e)
 			}
-			err = cerr.err
+			err = lerr
 		}
 	}()
 	d.p.Execute()
 	return nil
+}
+
+func (e *parseError) Line() int {
+	tokens := []token32{e.max}
+	positions, p := make([]int, 2*len(tokens)), 0
+	for _, token := range tokens {
+		positions[p], p = int(token.begin), p+1
+		positions[p], p = int(token.end), p+1
+	}
+	for _, t := range translatePositions(e.p.buffer, positions) {
+		if e.p.line < t.line {
+			e.p.line = t.line
+		}
+	}
+	return e.p.line
 }

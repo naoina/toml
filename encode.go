@@ -83,9 +83,19 @@ func (e *Encoder) Encode(v interface{}) error {
 	return buf.writeTo(e.w, "")
 }
 
-// Marshaler is the interface implemented by objects that can marshal themselves into valid TOML.
+// Marshaler can be implemented to override the encoding of TOML values. The returned text
+// must be a simple TOML value (i.e. not a table) and is inserted into marshaler output.
+//
+// This interface exists for backwards-compatibility reasons. You probably want to
+// implement encoding.TextMarshaler or MarshalerRec instead.
 type Marshaler interface {
 	MarshalTOML() ([]byte, error)
+}
+
+// MarshalerRec can be implemented to override the TOML encoding of a type.
+// The returned value is marshaled in place of the receiver.
+type MarshalerRec interface {
+	MarshalTOML() (interface{}, error)
 }
 
 type tableBuf struct {
@@ -220,9 +230,9 @@ func (b *tableBuf) field(name string, rv reflect.Value) error {
 }
 
 func (b *tableBuf) value(rv reflect.Value, name string) (bool, error) {
-	ok, err := b.marshaler(rv)
-	if ok {
-		return false, err
+	isMarshaler, isTable, err := b.marshaler(rv, name)
+	if isMarshaler {
+		return isTable, err
 	}
 	switch rv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -287,24 +297,31 @@ func (b *tableBuf) value(rv reflect.Value, name string) (bool, error) {
 	return false, nil
 }
 
-func (b *tableBuf) marshaler(rv reflect.Value) (bool, error) {
+func (b *tableBuf) marshaler(rv reflect.Value, name string) (handled, isTable bool, err error) {
 	switch t := rv.Interface().(type) {
 	case encoding.TextMarshaler:
 		enc, err := t.MarshalText()
 		if err != nil {
-			return true, err
+			return true, false, err
 		}
 		b.body = encodeTextMarshaler(b.body, string(enc))
-		return true, nil
+		return true, false, nil
+	case MarshalerRec:
+		newval, err := t.MarshalTOML()
+		if err != nil {
+			return true, false, err
+		}
+		isTable, err = b.value(reflect.ValueOf(newval), name)
+		return true, isTable, err
 	case Marshaler:
 		enc, err := t.MarshalTOML()
 		if err != nil {
-			return true, err
+			return true, false, err
 		}
 		b.body = append(b.body, enc...)
-		return true, nil
+		return true, false, nil
 	}
-	return false, nil
+	return false, false, nil
 }
 
 func encodeTextMarshaler(buf []byte, v string) []byte {
