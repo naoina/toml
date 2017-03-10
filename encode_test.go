@@ -9,6 +9,11 @@ import (
 )
 
 func TestMarshal(t *testing.T) {
+	type iceCreamPreference struct {
+		Flavor string
+		Scoops int
+	}
+
 	for _, v := range []struct {
 		v      interface{}
 		expect string
@@ -35,6 +40,12 @@ func TestMarshal(t *testing.T) {
 		{struct {
 			Name string `toml:",omitempty"`
 		}{""}, ""},
+		{struct {
+			Name map[string]string `toml:"name"`
+		}{map[string]string{"foo": "bar", "baz": "quux"}}, "[name]\nbaz=\"quux\"\nfoo=\"bar\"\n"},
+		{struct {
+			Preferences map[string]iceCreamPreference `toml:"preferences"`
+		}{map[string]iceCreamPreference{"tim": iceCreamPreference{"Vanilla", 3}}}, "[preferences]\n[preferences.tim]\nflavor=\"Vanilla\"\nscoops=3\n"},
 	} {
 		b, err := toml.Marshal(v.v)
 		var actual interface{} = err
@@ -294,5 +305,66 @@ name="plantain"
 		if !reflect.DeepEqual(actual, expect) {
 			t.Errorf(`Unmarshal after Marshal => %#v; want %#v`, v, actual, expect)
 		}
+	}
+}
+
+func TestMarshal_MixedStructMap(t *testing.T) {
+	type location struct {
+		X int
+		Y int
+	}
+
+	type menuItem struct {
+		Name  string
+		Price int
+	}
+
+	type store struct {
+		StoreName string
+		Locations map[string]location
+		Cuisine   string
+		Menu      []menuItem
+	}
+
+	foo := store{
+		"Arby's",
+		map[string]location{
+			"Boston": location{1, 2},
+		},
+		"American",
+		[]menuItem{
+			menuItem{"Burger", 12},
+			menuItem{"Fries", 4},
+		},
+	}
+
+	str, err := toml.Marshal(foo)
+	if err != nil {
+		t.Errorf(`Error marshalling example: %s`, err.Error())
+	}
+
+	expect := `store_name="Arby's"
+cuisine="American"
+[locations]
+[locations.Boston]
+x=1
+y=2
+[[menu]]
+name="Burger"
+price=12
+[[menu]]
+name="Fries"
+price=4
+`
+
+	if string(str) != expect {
+		t.Errorf(`Marshal => %#v; want %#v`, string(str), expect)
+	}
+
+	var out store
+	toml.Unmarshal(str, &out)
+
+	if !reflect.DeepEqual(out, foo) {
+		t.Errorf(`Unmarshal => %#v; want %#v`, out, foo)
 	}
 }
