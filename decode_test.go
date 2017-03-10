@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/naoina/toml"
+	"github.com/2qif49lt/toml"
 )
 
 const (
