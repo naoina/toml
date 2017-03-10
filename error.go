@@ -6,14 +6,13 @@ import (
 )
 
 func (e *parseError) Line() int {
-	tokens := e.p.tokenTree.Error()
-	positions := make([]int, len(tokens)*2)
-	p := 0
+	tokens := []token32{e.max}
+	positions, p := make([]int, 2*len(tokens)), 0
 	for _, token := range tokens {
 		positions[p], p = int(token.begin), p+1
 		positions[p], p = int(token.end), p+1
 	}
-	for _, t := range translatePositions(e.p.Buffer, positions) {
+	for _, t := range translatePositions(e.p.buffer, positions) {
 		if e.p.line < t.line {
 			e.p.line = t.line
 		}
