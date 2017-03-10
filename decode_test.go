@@ -10,17 +10,13 @@ import (
 	"time"
 )
 
-const (
-	dataDir = "testdata"
-)
-
-func loadTestData() ([]byte, error) {
-	f := filepath.Join(dataDir, "test.toml")
+func loadTestData(file string) []byte {
+	f := filepath.Join("testdata", file)
 	data, err := ioutil.ReadFile(f)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return data, nil
+	return data
 }
 
 func mustTime(tm time.Time, err error) time.Time {
@@ -34,13 +30,9 @@ type Name struct {
 	First string
 	Last  string
 }
-type Point struct {
-	X int
-	Y int
-}
 type Inline struct {
 	Name  Name
-	Point Point
+	Point map[string]int
 }
 type Subtable struct {
 	Key string
@@ -144,9 +136,9 @@ type Array struct {
 	Key6 []int
 }
 type Product struct {
-	Name  string
-	Sku   int64
-	Color string
+	Name  string `toml:",omitempty"`
+	Sku   int64  `toml:",omitempty"`
+	Color string `toml:",omitempty"`
 }
 type Physical struct {
 	Color string
@@ -173,33 +165,8 @@ type testStruct struct {
 	Fruit    []Fruit
 }
 
-// Values of this type will be set to the data that UnmarshalText is called with.
-type implementsTextUnmarshaler string
-
-var errTextUnmarshaler = errors.New("UnmarshalText called with data = error")
-
-func (x *implementsTextUnmarshaler) UnmarshalText(data []byte) error {
-	*x = implementsTextUnmarshaler(data)
-	if *x == "error" {
-		return errTextUnmarshaler
-	}
-	return nil
-}
-
-func TestUnmarshal(t *testing.T) {
-	data, err := loadTestData()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var v testStruct
-	var actual interface{} = Unmarshal(data, &v)
-	var expect interface{} = nil
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf(`toml.Unmarshal(data, &testStruct{}) => %#v; want %#v`, actual, expect)
-	}
-
-	actual = v
-	expect = testStruct{
+func theTestStruct() testStruct {
+	return testStruct{
 		Table: Table{
 			Key: "value",
 			Subtable: Subtable{
@@ -210,9 +177,9 @@ func TestUnmarshal(t *testing.T) {
 					First: "Tom",
 					Last:  "Preston-Werner",
 				},
-				Point: Point{
-					X: 1,
-					Y: 2,
+				Point: map[string]int{
+					"x": 1,
+					"y": 2,
 				},
 			},
 		},
@@ -314,6 +281,33 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 	}
+}
+
+// Values of this type will be set to the data that UnmarshalText is called with.
+type implementsTextUnmarshaler string
+
+var errTextUnmarshaler = errors.New("UnmarshalText called with data = error")
+
+func (x *implementsTextUnmarshaler) UnmarshalText(data []byte) error {
+	*x = implementsTextUnmarshaler(data)
+	if *x == "error" {
+		return errTextUnmarshaler
+	}
+	return nil
+}
+
+func TestUnmarshal(t *testing.T) {
+	data := loadTestData("test.toml")
+
+	var v testStruct
+	var actual interface{} = Unmarshal(data, &v)
+	var expect interface{} = nil
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf(`toml.Unmarshal(data, &testStruct{}) => %#v; want %#v`, actual, expect)
+	}
+
+	actual = v
+	expect = theTestStruct()
 	if !reflect.DeepEqual(actual, expect) {
 		t.Errorf(`toml.Unmarshal(data, v); v => %#v; want %#v`, actual, expect)
 	}

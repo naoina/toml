@@ -1,7 +1,6 @@
 package toml
 
 import (
-	"go/ast"
 	"reflect"
 	"strings"
 	"unicode"
@@ -41,7 +40,7 @@ func findField(rv reflect.Value, name string) (field reflect.Value, fieldName st
 		rt := rv.Type()
 		for i := 0; i < rt.NumField(); i++ {
 			ft := rt.Field(i)
-			if !ast.IsExported(ft.Name) {
+			if ft.PkgPath != "" && !ft.Anonymous {
 				continue
 			}
 			if col, _ := extractTag(ft.Tag.Get(fieldTagName)); col == name {
@@ -69,11 +68,4 @@ func extractTag(tag string) (col, rest string) {
 		return strings.TrimSpace(tags[0]), strings.TrimSpace(tags[1])
 	}
 	return strings.TrimSpace(tags[0]), ""
-}
-
-func tableName(prefix, name string) string {
-	if prefix != "" {
-		return prefix + string(tableSeparator) + name
-	}
-	return name
 }

@@ -28,3 +28,19 @@ type errorOutOfRange struct {
 func (err *errorOutOfRange) Error() string {
 	return fmt.Sprintf("value %d is out of range for `%v` type", err.v, err.kind)
 }
+
+type marshalNilError struct {
+	typ reflect.Type
+}
+
+func (err *marshalNilError) Error() string {
+	return fmt.Sprintf("toml: cannot marshal nil %s", err.typ)
+}
+
+type marshalTableError struct {
+	typ reflect.Type
+}
+
+func (err *marshalTableError) Error() string {
+	return fmt.Sprintf("toml: cannot marshal %s as table, want struct or map type", err.typ)
+}

@@ -35,10 +35,9 @@ func BenchmarkUnmarshal(b *testing.B) {
 			Hosts []string
 		}
 	}
-	data, err := loadTestData()
-	if err != nil {
-		b.Fatal(err)
-	}
+	data := loadTestData("test.toml")
+	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		if err := Unmarshal(data, &v); err != nil {
 			b.Fatal(err)
