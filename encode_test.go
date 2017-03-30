@@ -123,7 +123,7 @@ var marshalTests = []struct {
 	{
 		v: map[string]interface{}{
 			"intKeys":       map[int]int{1: 1, 2: 2, 3: 3},
-			"marshalerKeys": map[time.Time]int{{}: 1},
+			"marshalerKeys": map[time.Time]int{time.Time{}: 1},
 		},
 		expect: loadTestData("marshal-funkymapkeys.toml"),
 	},
