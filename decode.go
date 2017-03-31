@@ -38,9 +38,9 @@ var (
 //	TOML floats to float32 or float64
 //	TOML booleans to bool
 //	TOML datetimes to time.Time
-//	TOML arrays to any type of slice or []interface{}
-//	TOML tables to struct
-//	TOML array of tables to slice of struct
+//	TOML arrays to any type of slice
+//	TOML tables to struct or map
+//	TOML array tables to slice of struct or map
 func Unmarshal(data []byte, v interface{}) error {
 	table, err := Parse(data)
 	if err != nil {
@@ -104,9 +104,9 @@ type Unmarshaler interface {
 //	TOML floats to float32 or float64
 //	TOML booleans to bool
 //	TOML datetimes to time.Time
-//	TOML arrays to any type of slice or []interface{}
-//	TOML tables to struct
-//	TOML array of tables to slice of struct
+//	TOML arrays to any type of slice
+//	TOML tables to struct or map
+//	TOML array tables to slice of struct or map
 func UnmarshalTable(t *ast.Table, v interface{}) error {
 	rv := reflect.ValueOf(v)
 	toplevelMap := rv.Kind() == reflect.Map
@@ -145,8 +145,8 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 	if err, ok := setUnmarshaler(rv, t); ok {
 		return lineError(t.Line, err)
 	}
-	switch rv.Kind() {
-	case reflect.Struct:
+	switch {
+	case rv.Kind() == reflect.Struct:
 		for key, fieldAst := range t.Fields {
 			fv, fieldName, found := findField(rv, key)
 			if !found {
@@ -156,7 +156,7 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 				return lineErrorField(fieldLineNumber(fieldAst), rv.Type().String()+"."+fieldName, err)
 			}
 		}
-	case reflect.Map, reflect.Interface:
+	case rv.Kind() == reflect.Map || isEface(rv):
 		m := rv
 		if !toplevelMap {
 			if rv.Kind() == reflect.Interface {
@@ -211,10 +211,10 @@ func unmarshalField(rv reflect.Value, fieldAst interface{}) error {
 			return err
 		}
 		var slice reflect.Value
-		switch rv.Kind() {
-		case reflect.Slice:
+		switch {
+		case rv.Kind() == reflect.Slice:
 			slice = reflect.MakeSlice(rv.Type(), len(av), len(av))
-		case reflect.Interface:
+		case isEface(rv):
 			slice = reflect.ValueOf(make([]interface{}, len(av)))
 		default:
 			return &unmarshalTypeError{"array table", "slice", rv.Type()}
@@ -349,20 +349,21 @@ func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
 }
 
 func setInt(fv reflect.Value, v *ast.Integer) error {
-	switch fv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	k := fv.Kind()
+	switch {
+	case k >= reflect.Int && k <= reflect.Int64:
 		i, err := strconv.ParseInt(v.Value, 10, int(fv.Type().Size()*8))
 		if err != nil {
 			return convertNumError(fv.Kind(), err)
 		}
 		fv.SetInt(i)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case k >= reflect.Uint && k <= reflect.Uintptr:
 		i, err := strconv.ParseUint(v.Value, 10, int(fv.Type().Size()*8))
 		if err != nil {
 			return convertNumError(fv.Kind(), err)
 		}
 		fv.SetUint(i)
-	case reflect.Interface:
+	case isEface(fv):
 		i, err := strconv.ParseInt(v.Value, 10, 64)
 		if err != nil {
 			return convertNumError(reflect.Int64, err)
@@ -379,13 +380,13 @@ func setFloat(fv reflect.Value, v *ast.Float) error {
 	if err != nil {
 		return err
 	}
-	switch fv.Kind() {
-	case reflect.Float32, reflect.Float64:
+	switch {
+	case fv.Kind() == reflect.Float32 || fv.Kind() == reflect.Float64:
 		if fv.OverflowFloat(f) {
 			return &overflowError{fv.Kind(), v.Value}
 		}
 		fv.SetFloat(f)
-	case reflect.Interface:
+	case isEface(fv):
 		fv.Set(reflect.ValueOf(f))
 	default:
 		return &unmarshalTypeError{"float", "", fv.Type()}
@@ -394,41 +395,36 @@ func setFloat(fv reflect.Value, v *ast.Float) error {
 }
 
 func setString(fv reflect.Value, v *ast.String) error {
-	switch fv.Kind() {
-	case reflect.String:
+	switch {
+	case fv.Kind() == reflect.String:
 		fv.SetString(v.Value)
-		return nil
-	case reflect.Interface:
-		// TODO: need non-empty interface check here
+	case isEface(fv):
 		fv.Set(reflect.ValueOf(v.Value))
-		return nil
 	default:
 		return &unmarshalTypeError{"string", "", fv.Type()}
 	}
+	return nil
 }
 
 func setBoolean(fv reflect.Value, v *ast.Boolean) error {
 	b, _ := v.Boolean()
-	switch fv.Kind() {
-	case reflect.Bool:
+	switch {
+	case fv.Kind() == reflect.Bool:
 		fv.SetBool(b)
-		return nil
-	case reflect.Interface:
-		// TODO: need non-empty interface check here
+	case isEface(fv):
 		fv.Set(reflect.ValueOf(b))
-		return nil
 	default:
 		return &unmarshalTypeError{"boolean", "", fv.Type()}
 	}
+	return nil
 }
 
 func setArray(rv reflect.Value, v *ast.Array) error {
 	var slicetyp reflect.Type
-	switch rv.Kind() {
-	case reflect.Slice:
+	switch {
+	case rv.Kind() == reflect.Slice:
 		slicetyp = rv.Type()
-	case reflect.Interface:
-		// TODO: need non-empty interface check here
+	case isEface(rv):
 		slicetyp = reflect.SliceOf(rv.Type())
 	default:
 		return &unmarshalTypeError{"array", "slice", rv.Type()}
@@ -455,6 +451,10 @@ func setArray(rv reflect.Value, v *ast.Array) error {
 	}
 	rv.Set(slice)
 	return nil
+}
+
+func isEface(rv reflect.Value) bool {
+	return rv.Kind() == reflect.Interface && rv.Type().NumMethod() == 0
 }
 
 type stack struct {
