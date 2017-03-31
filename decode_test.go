@@ -1227,6 +1227,28 @@ first = "evan"
 			actual: map[string]*Name{},
 			expect: map[string]*Name{"p": {First: "evan"}},
 		},
+		{
+			data: `foo = 1
+bar = 2
+`,
+			actual: map[testTextUnmarshaler]int{},
+			expect: map[testTextUnmarshaler]int{"Unmarshaled: foo": 1, "Unmarshaled: bar": 2},
+		},
+		{
+			data: `1 = 1
+-2 = 2
+`,
+			actual: map[int]int{},
+			expect: map[int]int{1: 1, -2: 2},
+		},
+		{
+			data: `1 = 1
+-129 = 2
+`,
+			actual: map[int8]int{},
+			expect: map[int8]int{1: 1},
+			err:    lineError(2, &overflowError{reflect.Int8, "-129"}),
+		},
 	})
 }
 

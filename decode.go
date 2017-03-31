@@ -163,11 +163,15 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 		}
 		elemtyp := rv.Type().Elem()
 		for key, fieldAst := range t.Fields {
+			kv, err := unmarshalMapKey(rv.Type().Key(), key)
+			if err != nil {
+				return lineError(fieldLineNumber(fieldAst), err)
+			}
 			fv := reflect.New(elemtyp).Elem()
 			if err := unmarshalField(fv, fieldAst); err != nil {
 				return lineError(fieldLineNumber(fieldAst), err)
 			}
-			m.SetMapIndex(reflect.ValueOf(key), fv)
+			m.SetMapIndex(kv, fv)
 		}
 		if !toplevelMap {
 			rv.Set(m)
@@ -218,6 +222,32 @@ func unmarshalField(rv reflect.Value, fieldAst interface{}) error {
 		panic(fmt.Sprintf("BUG: unhandled AST node type %T", av))
 	}
 	return nil
+}
+
+func unmarshalMapKey(typ reflect.Type, key string) (reflect.Value, error) {
+	rv := reflect.New(typ).Elem()
+	if u, ok := rv.Addr().Interface().(encoding.TextUnmarshaler); ok {
+		return rv, u.UnmarshalText([]byte(key))
+	}
+	switch typ.Kind() {
+	case reflect.String:
+		rv.SetString(key)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		i, err := strconv.ParseInt(key, 10, int(typ.Size()*8))
+		if err != nil {
+			return rv, convertNumError(typ.Kind(), err)
+		}
+		rv.SetInt(i)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		i, err := strconv.ParseUint(key, 10, int(typ.Size()*8))
+		if err != nil {
+			return rv, convertNumError(typ.Kind(), err)
+		}
+		rv.SetUint(i)
+	default:
+		return rv, fmt.Errorf("invalid map key type %s", typ)
+	}
+	return rv, nil
 }
 
 func setValue(lhs reflect.Value, val ast.Value) error {
