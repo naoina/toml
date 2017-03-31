@@ -414,16 +414,6 @@ func setBoolean(fv reflect.Value, v *ast.Boolean) error {
 }
 
 func setArray(rv reflect.Value, v *ast.Array) error {
-	if len(v.Value) == 0 {
-		return nil
-	}
-	tomltyp := reflect.TypeOf(v.Value[0])
-	for _, vv := range v.Value[1:] {
-		if tomltyp != reflect.TypeOf(vv) {
-			return errArrayMultiType
-		}
-	}
-
 	var slicetyp reflect.Type
 	switch rv.Kind() {
 	case reflect.Slice:
@@ -435,9 +425,19 @@ func setArray(rv reflect.Value, v *ast.Array) error {
 		return &unmarshalTypeError{"array", "slice", rv.Type()}
 	}
 
+	if len(v.Value) == 0 {
+		// Ensure defined slices are always set to a non-nil value.
+		rv.Set(reflect.MakeSlice(slicetyp, 0, 0))
+		return nil
+	}
+
+	tomltyp := reflect.TypeOf(v.Value[0])
 	slice := reflect.MakeSlice(slicetyp, len(v.Value), len(v.Value))
 	typ := slicetyp.Elem()
 	for i, vv := range v.Value {
+		if i > 0 && tomltyp != reflect.TypeOf(vv) {
+			return errArrayMultiType
+		}
 		tmp := reflect.New(typ).Elem()
 		if err := setValue(tmp, vv); err != nil {
 			return err

@@ -511,34 +511,22 @@ func TestUnmarshal_WithDatetime(t *testing.T) {
 }
 
 func TestUnmarshal_WithArray(t *testing.T) {
+	type arrays struct {
+		Ints    []int
+		Strings []string
+	}
+
 	testUnmarshal(t, []testcase{
-		{`arrayval = []`, nil, &struct{ Arrayval []interface{} }{}, &struct{ Arrayval []interface{} }{}},
-		{`arrayval = [ 1 ]`, nil, &struct{ Arrayval []int }{},
-			&struct {
-				Arrayval []int
-			}{
-				[]int{1},
-			}},
-		{`arrayval = [ 1, 2, 3 ]`, nil, &struct{ Arrayval []int }{},
-			&struct {
-				Arrayval []int
-			}{
-				[]int{1, 2, 3},
-			}},
-		{`arrayval = [ 1, 2, 3, ]`, nil, &struct{ Arrayval []int }{},
-			&struct {
-				Arrayval []int
-			}{
-				[]int{1, 2, 3},
-			}},
-		{`arrayval = ["red", "yellow", "green"]`, nil, &struct{ Arrayval []string }{},
-			&struct{ Arrayval []string }{
-				[]string{"red", "yellow", "green"},
-			}},
-		{`arrayval = [ "all", 'strings', """are the same""", '''type''']`, nil, &struct{ Arrayval []string }{},
-			&struct{ Arrayval []string }{
-				[]string{"all", "strings", "are the same", "type"},
-			}},
+		{`ints = []`, nil, &arrays{}, &arrays{Ints: []int{}}},
+		{`ints = [ 1 ]`, nil, &arrays{}, &arrays{Ints: []int{1}}},
+		{`ints = [ 1, 2, 3 ]`, nil, &arrays{}, &arrays{Ints: []int{1, 2, 3}}},
+		{`ints = [ 1, 2, 3, ]`, nil, &arrays{}, &arrays{Ints: []int{1, 2, 3}}},
+		{`strings = ["red", "yellow", "green"]`, nil, &arrays{}, &arrays{Strings: []string{"red", "yellow", "green"}}},
+		{
+			data:   `strings = [ "all", 'strings', """are the same""", '''type''']`,
+			actual: &arrays{},
+			expect: &arrays{Strings: []string{"all", "strings", "are the same", "type"}},
+		},
 		{`arrayval = [[1,2],[3,4,5]]`, nil, &struct{ Arrayval [][]int }{},
 			&struct{ Arrayval [][]int }{
 				[][]int{
@@ -585,10 +573,10 @@ func TestUnmarshal_WithArray(t *testing.T) {
 				},
 			}},
 		{
-			data:   `arrayval = [ 1, 2.0 ] # note: this is NOT ok`,
-			err:    lineErrorField(1, "struct { Arrayval []interface {} }.Arrayval", errArrayMultiType),
-			actual: &struct{ Arrayval []interface{} }{},
-			expect: &struct{ Arrayval []interface{} }{},
+			data:   `ints = [ 1, 2.0 ] # note: this is NOT ok`,
+			err:    lineErrorField(1, "toml.arrays.Ints", errArrayMultiType),
+			actual: &arrays{},
+			expect: &arrays{},
 		},
 		{`key = [
   1, 2, 3
