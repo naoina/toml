@@ -156,14 +156,18 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 				return lineErrorField(fieldLineNumber(fieldAst), rv.Type().String()+"."+fieldName, err)
 			}
 		}
-	case reflect.Map: // TODO: reflect.Interface
+	case reflect.Map, reflect.Interface:
 		m := rv
 		if !toplevelMap {
-			m = reflect.MakeMap(rv.Type())
+			if rv.Kind() == reflect.Interface {
+				m = reflect.ValueOf(make(map[string]interface{}))
+			} else {
+				m = reflect.MakeMap(rv.Type())
+			}
 		}
-		elemtyp := rv.Type().Elem()
+		elemtyp := m.Type().Elem()
 		for key, fieldAst := range t.Fields {
-			kv, err := unmarshalMapKey(rv.Type().Key(), key)
+			kv, err := unmarshalMapKey(m.Type().Key(), key)
 			if err != nil {
 				return lineError(fieldLineNumber(fieldAst), err)
 			}
@@ -206,12 +210,17 @@ func unmarshalField(rv reflect.Value, fieldAst interface{}) error {
 		if err, ok := setUnmarshaler(rv, fieldAst); ok {
 			return err
 		}
-		if rv.Kind() != reflect.Slice {
+		var slice reflect.Value
+		switch rv.Kind() {
+		case reflect.Slice:
+			slice = reflect.MakeSlice(rv.Type(), len(av), len(av))
+		case reflect.Interface:
+			slice = reflect.ValueOf(make([]interface{}, len(av)))
+		default:
 			return &unmarshalTypeError{"array table", "slice", rv.Type()}
 		}
-		slice := reflect.MakeSlice(rv.Type(), len(av), len(av))
 		for i, tbl := range av {
-			vv := reflect.New(rv.Type().Elem()).Elem()
+			vv := reflect.New(slice.Type().Elem()).Elem()
 			if err := unmarshalTable(vv, tbl, false); err != nil {
 				return err
 			}

@@ -871,6 +871,35 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 				},
 			},
 		},
+		{
+			data: string(loadTestData("unmarshal-arraytable-nested-1.toml")),
+			expect: map[string]interface{}{
+				"fruit": []interface{}{
+					map[string]interface{}{
+						"name": "apple",
+						"physical": map[string]interface{}{
+							"color": "red",
+							"shape": "round",
+						},
+						"variety": []interface{}{
+							map[string]interface{}{"name": "red delicious"},
+							map[string]interface{}{"name": "granny smith"},
+						},
+					},
+					map[string]interface{}{
+						"name": "banana",
+						"physical": map[string]interface{}{
+							"color": "yellow",
+							"shape": "lune",
+						},
+						"variety": []interface{}{
+							map[string]interface{}{"name": "plantain"},
+						},
+					},
+				},
+			},
+		},
+
 		// errors
 		{
 			data:   string(loadTestData("unmarshal-arraytable-conflict-1.toml")),
