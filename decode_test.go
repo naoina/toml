@@ -305,18 +305,28 @@ func TestUnmarshal(t *testing.T) {
 type testcase struct {
 	data   string
 	err    error
-	actual interface{}
 	expect interface{}
 }
 
 func testUnmarshal(t *testing.T, testcases []testcase) {
-	for _, v := range testcases {
-		err := Unmarshal([]byte(v.data), v.actual)
-		if !reflect.DeepEqual(err, v.err) {
-			t.Errorf("Error mismatch for input:\n%s\ngot: %+v\nwant: %+v", v.data, err, v.err)
+	for _, test := range testcases {
+		// Create a test value of the same type as expect.
+		typ := reflect.TypeOf(test.expect)
+		var val interface{}
+		if typ.Kind() == reflect.Map {
+			val = reflect.MakeMap(typ).Interface()
+		} else if typ.Kind() == reflect.Ptr {
+			val = reflect.New(typ.Elem()).Interface()
+		} else {
+			panic("invalid 'expect' type " + typ.String())
 		}
-		if err == nil && !reflect.DeepEqual(v.actual, v.expect) {
-			t.Errorf("Unmarshal value mismatch for input:\n%s\ndiff:\n%s", v.data, pretty.Compare(v.actual, v.expect))
+
+		err := Unmarshal([]byte(test.data), val)
+		if !reflect.DeepEqual(err, test.err) {
+			t.Errorf("Error mismatch for input:\n%s\ngot: %+v\nwant: %+v", test.data, err, test.err)
+		}
+		if err == nil && !reflect.DeepEqual(val, test.expect) {
+			t.Errorf("Unmarshal value mismatch for input:\n%s\ndiff:\n%s", test.data, pretty.Compare(val, test.expect))
 		}
 	}
 }
@@ -335,58 +345,40 @@ func TestUnmarshal_WithString(t *testing.T) {
 		Lines    string
 	}
 	testUnmarshal(t, []testcase{
-		{`str = "I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF."`, nil, &testStruct{}, &testStruct{
-			Str: "I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF.",
-		}},
-		{`key1 = "One\nTwo"
-key2 = """One\nTwo"""
-key3 = """
-One
-Two"""
-`, nil, &testStruct{}, &testStruct{
-			Key1: "One\nTwo",
-			Key2: "One\nTwo",
-			Key3: "One\nTwo",
-		}},
-		{`# The following strings are byte-for-byte equivalent:
-key1 = "The quick brown fox jumps over the lazy dog."
-
-key2 = """
-The quick brown \
-
-
-  fox jumps over \
-    the lazy dog."""
-
-key3 = """\
-       The quick brown \
-       fox jumps over \
-       the lazy dog.\
-       """`, nil, &testStruct{}, &testStruct{
-			Key1: "The quick brown fox jumps over the lazy dog.",
-			Key2: "The quick brown fox jumps over the lazy dog.",
-			Key3: "The quick brown fox jumps over the lazy dog.",
-		}},
-		{`# What you see is what you get.
-winpath  = 'C:\Users\nodejs\templates'
-winpath2 = '\\ServerX\admin$\system32\'
-quoted   = 'Tom "Dubs" Preston-Werner'
-regex    = '<\i\c*\s*>'`, nil, &testStruct{}, &testStruct{
-			Winpath:  `C:\Users\nodejs\templates`,
-			Winpath2: `\\ServerX\admin$\system32\`,
-			Quoted:   `Tom "Dubs" Preston-Werner`,
-			Regex:    `<\i\c*\s*>`,
-		}},
-		{`regex2 = '''I [dw]on't need \d{2} apples'''
-lines  = '''
-The first newline is
-trimmed in raw strings.
-   All other whitespace
-   is preserved.
-'''`, nil, &testStruct{}, &testStruct{
-			Regex2: `I [dw]on't need \d{2} apples`,
-			Lines:  "The first newline is\ntrimmed in raw strings.\n   All other whitespace\n   is preserved.\n",
-		}},
+		{
+			data: `str = "I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF."`,
+			expect: &testStruct{
+				Str: "I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF.",
+			},
+		},
+		{
+			data:   string(loadTestData("unmarshal-string-1.toml")),
+			expect: &testStruct{Key1: "One\nTwo", Key2: "One\nTwo", Key3: "One\nTwo"},
+		},
+		{
+			data: string(loadTestData("unmarshal-string-2.toml")),
+			expect: &testStruct{
+				Key1: "The quick brown fox jumps over the lazy dog.",
+				Key2: "The quick brown fox jumps over the lazy dog.",
+				Key3: "The quick brown fox jumps over the lazy dog.",
+			},
+		},
+		{
+			data: string(loadTestData("unmarshal-string-3.toml")),
+			expect: &testStruct{
+				Winpath:  `C:\Users\nodejs\templates`,
+				Winpath2: `\\ServerX\admin$\system32\`,
+				Quoted:   `Tom "Dubs" Preston-Werner`,
+				Regex:    `<\i\c*\s*>`,
+			},
+		},
+		{
+			data: string(loadTestData("unmarshal-string-4.toml")),
+			expect: &testStruct{
+				Regex2: `I [dw]on't need \d{2} apples`,
+				Lines:  "The first newline is\ntrimmed in raw strings.\n   All other whitespace\n   is preserved.\n",
+			},
+		},
 	})
 }
 
@@ -395,47 +387,44 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		Intval int64
 	}
 	testUnmarshal(t, []testcase{
-		{`intval = 0`, nil, &testStruct{}, &testStruct{0}},
-		{`intval = +0`, nil, &testStruct{}, &testStruct{0}},
-		{`intval = -0`, nil, &testStruct{}, &testStruct{-0}},
-		{`intval = 1`, nil, &testStruct{}, &testStruct{1}},
-		{`intval = +1`, nil, &testStruct{}, &testStruct{1}},
-		{`intval = -1`, nil, &testStruct{}, &testStruct{-1}},
-		{`intval = 10`, nil, &testStruct{}, &testStruct{10}},
-		{`intval = 777`, nil, &testStruct{}, &testStruct{777}},
-		{`intval = 2147483647`, nil, &testStruct{}, &testStruct{2147483647}},
-		{`intval = 2147483648`, nil, &testStruct{}, &testStruct{2147483648}},
-		{`intval = +2147483648`, nil, &testStruct{}, &testStruct{2147483648}},
-		{`intval = -2147483648`, nil, &testStruct{}, &testStruct{-2147483648}},
-		{`intval = -2147483649`, nil, &testStruct{}, &testStruct{-2147483649}},
-		{`intval = 9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
-		{`intval = +9223372036854775807`, nil, &testStruct{}, &testStruct{9223372036854775807}},
-		{`intval = -9223372036854775808`, nil, &testStruct{}, &testStruct{-9223372036854775808}},
-		{`intval = 1_000`, nil, &testStruct{}, &testStruct{1000}},
-		{`intval = 5_349_221`, nil, &testStruct{}, &testStruct{5349221}},
-		{`intval = 1_2_3_4_5`, nil, &testStruct{}, &testStruct{12345}},
+		{`intval = 0`, nil, &testStruct{0}},
+		{`intval = +0`, nil, &testStruct{0}},
+		{`intval = -0`, nil, &testStruct{-0}},
+		{`intval = 1`, nil, &testStruct{1}},
+		{`intval = +1`, nil, &testStruct{1}},
+		{`intval = -1`, nil, &testStruct{-1}},
+		{`intval = 10`, nil, &testStruct{10}},
+		{`intval = 777`, nil, &testStruct{777}},
+		{`intval = 2147483647`, nil, &testStruct{2147483647}},
+		{`intval = 2147483648`, nil, &testStruct{2147483648}},
+		{`intval = +2147483648`, nil, &testStruct{2147483648}},
+		{`intval = -2147483648`, nil, &testStruct{-2147483648}},
+		{`intval = -2147483649`, nil, &testStruct{-2147483649}},
+		{`intval = 9223372036854775807`, nil, &testStruct{9223372036854775807}},
+		{`intval = +9223372036854775807`, nil, &testStruct{9223372036854775807}},
+		{`intval = -9223372036854775808`, nil, &testStruct{-9223372036854775808}},
+		{`intval = 1_000`, nil, &testStruct{1000}},
+		{`intval = 5_349_221`, nil, &testStruct{5349221}},
+		{`intval = 1_2_3_4_5`, nil, &testStruct{12345}},
 		// overflow
 		{
 			data:   `intval = 9223372036854775808`,
 			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "9223372036854775808"}),
-			actual: &testStruct{},
 			expect: &testStruct{},
 		},
 		{
 			data:   `intval = +9223372036854775808`,
 			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "+9223372036854775808"}),
-			actual: &testStruct{},
 			expect: &testStruct{},
 		},
 		{
 			data:   `intval = -9223372036854775809`,
 			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "-9223372036854775809"}),
-			actual: &testStruct{},
 			expect: &testStruct{},
 		},
 		// invalid _
-		{`intval = _1_000`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`intval = 1_000_`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`intval = _1_000`, lineError(1, errParse), &testStruct{}},
+		{`intval = 1_000_`, lineError(1, errParse), &testStruct{}},
 	})
 }
 
@@ -444,39 +433,39 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		Floatval float64
 	}
 	testUnmarshal(t, []testcase{
-		{`floatval = 0.0`, nil, &testStruct{}, &testStruct{0.0}},
-		{`floatval = +0.0`, nil, &testStruct{}, &testStruct{0.0}},
-		{`floatval = -0.0`, nil, &testStruct{}, &testStruct{-0.0}},
-		{`floatval = 0.1`, nil, &testStruct{}, &testStruct{0.1}},
-		{`floatval = +0.1`, nil, &testStruct{}, &testStruct{0.1}},
-		{`floatval = -0.1`, nil, &testStruct{}, &testStruct{-0.1}},
-		{`floatval = 0.2`, nil, &testStruct{}, &testStruct{0.2}},
-		{`floatval = +0.2`, nil, &testStruct{}, &testStruct{0.2}},
-		{`floatval = -0.2`, nil, &testStruct{}, &testStruct{-0.2}},
-		{`floatval = 1.0`, nil, &testStruct{}, &testStruct{1.0}},
-		{`floatval = +1.0`, nil, &testStruct{}, &testStruct{1.0}},
-		{`floatval = -1.0`, nil, &testStruct{}, &testStruct{-1.0}},
-		{`floatval = 1.1`, nil, &testStruct{}, &testStruct{1.1}},
-		{`floatval = +1.1`, nil, &testStruct{}, &testStruct{1.1}},
-		{`floatval = -1.1`, nil, &testStruct{}, &testStruct{-1.1}},
-		{`floatval = 3.1415`, nil, &testStruct{}, &testStruct{3.1415}},
-		{`floatval = +3.1415`, nil, &testStruct{}, &testStruct{3.1415}},
-		{`floatval = -3.1415`, nil, &testStruct{}, &testStruct{-3.1415}},
-		{`floatval = 10.2e5`, nil, &testStruct{}, &testStruct{10.2e5}},
-		{`floatval = +10.2e5`, nil, &testStruct{}, &testStruct{10.2e5}},
-		{`floatval = -10.2e5`, nil, &testStruct{}, &testStruct{-10.2e5}},
-		{`floatval = 10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
-		{`floatval = +10.2E5`, nil, &testStruct{}, &testStruct{10.2e5}},
-		{`floatval = -10.2E5`, nil, &testStruct{}, &testStruct{-10.2e5}},
-		{`floatval = 5e+22`, nil, &testStruct{}, &testStruct{5e+22}},
-		{`floatval = 1e6`, nil, &testStruct{}, &testStruct{1e6}},
-		{`floatval = -2E-2`, nil, &testStruct{}, &testStruct{-2E-2}},
-		{`floatval = 6.626e-34`, nil, &testStruct{}, &testStruct{6.626e-34}},
-		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{}, &testStruct{9224617.445991228313}},
-		{`floatval = 1e1_00`, nil, &testStruct{}, &testStruct{1e100}},
-		{`floatval = 1e02`, nil, &testStruct{}, &testStruct{1e2}},
-		{`floatval = _1e1_00`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`floatval = 1e1_00_`, lineError(1, errParse), &testStruct{}, &testStruct{}},
+		{`floatval = 0.0`, nil, &testStruct{0.0}},
+		{`floatval = +0.0`, nil, &testStruct{0.0}},
+		{`floatval = -0.0`, nil, &testStruct{-0.0}},
+		{`floatval = 0.1`, nil, &testStruct{0.1}},
+		{`floatval = +0.1`, nil, &testStruct{0.1}},
+		{`floatval = -0.1`, nil, &testStruct{-0.1}},
+		{`floatval = 0.2`, nil, &testStruct{0.2}},
+		{`floatval = +0.2`, nil, &testStruct{0.2}},
+		{`floatval = -0.2`, nil, &testStruct{-0.2}},
+		{`floatval = 1.0`, nil, &testStruct{1.0}},
+		{`floatval = +1.0`, nil, &testStruct{1.0}},
+		{`floatval = -1.0`, nil, &testStruct{-1.0}},
+		{`floatval = 1.1`, nil, &testStruct{1.1}},
+		{`floatval = +1.1`, nil, &testStruct{1.1}},
+		{`floatval = -1.1`, nil, &testStruct{-1.1}},
+		{`floatval = 3.1415`, nil, &testStruct{3.1415}},
+		{`floatval = +3.1415`, nil, &testStruct{3.1415}},
+		{`floatval = -3.1415`, nil, &testStruct{-3.1415}},
+		{`floatval = 10.2e5`, nil, &testStruct{10.2e5}},
+		{`floatval = +10.2e5`, nil, &testStruct{10.2e5}},
+		{`floatval = -10.2e5`, nil, &testStruct{-10.2e5}},
+		{`floatval = 10.2E5`, nil, &testStruct{10.2e5}},
+		{`floatval = +10.2E5`, nil, &testStruct{10.2e5}},
+		{`floatval = -10.2E5`, nil, &testStruct{-10.2e5}},
+		{`floatval = 5e+22`, nil, &testStruct{5e+22}},
+		{`floatval = 1e6`, nil, &testStruct{1e6}},
+		{`floatval = -2E-2`, nil, &testStruct{-2E-2}},
+		{`floatval = 6.626e-34`, nil, &testStruct{6.626e-34}},
+		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{9224617.445991228313}},
+		{`floatval = 1e1_00`, nil, &testStruct{1e100}},
+		{`floatval = 1e02`, nil, &testStruct{1e2}},
+		{`floatval = _1e1_00`, lineError(1, errParse), &testStruct{}},
+		{`floatval = 1e1_00_`, lineError(1, errParse), &testStruct{}},
 	})
 }
 
@@ -485,8 +474,8 @@ func TestUnmarshal_WithBoolean(t *testing.T) {
 		Boolval bool
 	}
 	testUnmarshal(t, []testcase{
-		{`boolval = true`, nil, &testStruct{}, &testStruct{true}},
-		{`boolval = false`, nil, &testStruct{}, &testStruct{false}},
+		{`boolval = true`, nil, &testStruct{true}},
+		{`boolval = false`, nil, &testStruct{false}},
 	})
 }
 
@@ -495,16 +484,16 @@ func TestUnmarshal_WithDatetime(t *testing.T) {
 		Datetimeval time.Time
 	}
 	testUnmarshal(t, []testcase{
-		{`datetimeval = 1979-05-27T07:32:00Z`, nil, &testStruct{}, &testStruct{
+		{`datetimeval = 1979-05-27T07:32:00Z`, nil, &testStruct{
 			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T07:32:00Z")),
 		}},
-		{`datetimeval = 2014-09-13T12:37:39Z`, nil, &testStruct{}, &testStruct{
+		{`datetimeval = 2014-09-13T12:37:39Z`, nil, &testStruct{
 			mustTime(time.Parse(time.RFC3339Nano, "2014-09-13T12:37:39Z")),
 		}},
-		{`datetimeval = 1979-05-27T00:32:00-07:00`, nil, &testStruct{}, &testStruct{
+		{`datetimeval = 1979-05-27T00:32:00-07:00`, nil, &testStruct{
 			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00-07:00")),
 		}},
-		{`datetimeval = 1979-05-27T00:32:00.999999-07:00`, nil, &testStruct{}, &testStruct{
+		{`datetimeval = 1979-05-27T00:32:00.999999-07:00`, nil, &testStruct{
 			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00.999999-07:00")),
 		}},
 	})
@@ -517,31 +506,29 @@ func TestUnmarshal_WithArray(t *testing.T) {
 	}
 
 	testUnmarshal(t, []testcase{
-		{`ints = []`, nil, &arrays{}, &arrays{Ints: []int{}}},
-		{`ints = [ 1 ]`, nil, &arrays{}, &arrays{Ints: []int{1}}},
-		{`ints = [ 1, 2, 3 ]`, nil, &arrays{}, &arrays{Ints: []int{1, 2, 3}}},
-		{`ints = [ 1, 2, 3, ]`, nil, &arrays{}, &arrays{Ints: []int{1, 2, 3}}},
-		{`strings = ["red", "yellow", "green"]`, nil, &arrays{}, &arrays{Strings: []string{"red", "yellow", "green"}}},
+		{`ints = []`, nil, &arrays{Ints: []int{}}},
+		{`ints = [ 1 ]`, nil, &arrays{Ints: []int{1}}},
+		{`ints = [ 1, 2, 3 ]`, nil, &arrays{Ints: []int{1, 2, 3}}},
+		{`ints = [ 1, 2, 3, ]`, nil, &arrays{Ints: []int{1, 2, 3}}},
+		{`strings = ["red", "yellow", "green"]`, nil, &arrays{Strings: []string{"red", "yellow", "green"}}},
 		{
 			data:   `strings = [ "all", 'strings', """are the same""", '''type''']`,
-			actual: &arrays{},
 			expect: &arrays{Strings: []string{"all", "strings", "are the same", "type"}},
 		},
-		{`arrayval = [[1,2],[3,4,5]]`, nil, &struct{ Arrayval [][]int }{},
-			&struct{ Arrayval [][]int }{
-				[][]int{
-					[]int{1, 2},
-					[]int{3, 4, 5},
-				},
-			}},
-		{`arrayval = [ [ 1, 2 ], ["a", "b", "c"] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
+		{`arrayval = [[1,2],[3,4,5]]`, nil, &struct{ Arrayval [][]int }{
+			[][]int{
+				[]int{1, 2},
+				[]int{3, 4, 5},
+			},
+		}},
+		{`arrayval = [ [ 1, 2 ], ["a", "b", "c"] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
 					[]interface{}{int64(1), int64(2)},
 					[]interface{}{"a", "b", "c"},
 				},
 			}},
-		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6] ] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
+		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6] ] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
 					[]interface{}{int64(1), int64(2)},
@@ -551,7 +538,7 @@ func TestUnmarshal_WithArray(t *testing.T) {
 					},
 				},
 			}},
-		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6], [7, 8] ] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
+		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6], [7, 8] ] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
 					[]interface{}{int64(1), int64(2)},
@@ -562,7 +549,7 @@ func TestUnmarshal_WithArray(t *testing.T) {
 					},
 				},
 			}},
-		{`arrayval = [ [[ 1, 2 ]], [3, 4], [5, 6] ] # this is ok`, nil, &struct{ Arrayval [][]interface{} }{},
+		{`arrayval = [ [[ 1, 2 ]], [3, 4], [5, 6] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
 					[]interface{}{
@@ -575,20 +562,21 @@ func TestUnmarshal_WithArray(t *testing.T) {
 		{
 			data:   `ints = [ 1, 2.0 ] # note: this is NOT ok`,
 			err:    lineErrorField(1, "toml.arrays.Ints", errArrayMultiType),
-			actual: &arrays{},
 			expect: &arrays{},
 		},
-		{`key = [
+		{
+			data: `key = [
   1, 2, 3
-]`, nil, &struct{ Key []int }{},
-			&struct{ Key []int }{
+]`,
+			expect: &struct{ Key []int }{
 				[]int{1, 2, 3},
 			}},
-		{`key = [
+		{
+			data: `key = [
   1,
   2, # this is ok
-]`, nil, &struct{ Key []int }{},
-			&struct{ Key []int }{
+]`,
+			expect: &struct{ Key []int }{
 				[]int{1, 2},
 			}},
 	})
@@ -642,9 +630,9 @@ func TestUnmarshal_WithTable(t *testing.T) {
 		}
 	}
 	testUnmarshal(t, []testcase{
-		{`[table]`, nil, &testStruct{}, &testStruct{}},
+		{`[table]`, nil, &testStruct{}},
 		{`[table]
-key = "value"`, nil, &testStruct{},
+key = "value"`, nil,
 			&testStruct{
 				Table: struct {
 					Key string
@@ -652,7 +640,7 @@ key = "value"`, nil, &testStruct{},
 					Key: "value",
 				},
 			}},
-		{`[dog.tater]`, nil, &testStruct{},
+		{`[dog.tater]`, nil,
 			&testStruct{
 				Dog: struct {
 					Tater struct{}
@@ -661,7 +649,7 @@ key = "value"`, nil, &testStruct{},
 				},
 			}},
 		{`[dog."tater.man"]
-type = "pug"`, nil, &testQuotedKeyStruct{},
+type = "pug"`, nil,
 			&testQuotedKeyStruct{
 				Dog: struct {
 					TaterMan struct {
@@ -676,7 +664,7 @@ type = "pug"`, nil, &testQuotedKeyStruct{},
 				},
 			}},
 		{`[dog."tater . man"]
-type = "pug"`, nil, &testQuotedKeyWithWhitespaceStruct{},
+type = "pug"`, nil,
 			&testQuotedKeyWithWhitespaceStruct{
 				Dog: struct {
 					TaterMan struct {
@@ -690,32 +678,32 @@ type = "pug"`, nil, &testQuotedKeyWithWhitespaceStruct{},
 					},
 				},
 			}},
-		{`[x.y.z.w] # for this to work`, nil, &testStruct{},
+		{`[x.y.z.w] # for this to work`, nil,
 			&testStruct{
 				X: X{},
 			}},
-		{`[ x .  y  . z . w ]`, nil, &testStruct{},
+		{`[ x .  y  . z . w ]`, nil,
 			&testStruct{
 				X: X{},
 			}},
-		{`[ x . "y" . z . "w" ]`, nil, &testStruct{},
+		{`[ x . "y" . z . "w" ]`, nil,
 			&testStruct{
 				X: X{},
 			}},
-		{`table = {}`, nil, &testStruct{}, &testStruct{}},
-		{`table = { key = "value" }`, nil, &testStruct{}, &testStruct{
+		{`table = {}`, nil, &testStruct{}},
+		{`table = { key = "value" }`, nil, &testStruct{
 			Table: struct {
 				Key string
 			}{
 				Key: "value",
 			},
 		}},
-		{`x = { y = { "z" = { w = {} } } }`, nil, &testStruct{}, &testStruct{X: X{}}},
+		{`x = { y = { "z" = { w = {} } } }`, nil, &testStruct{X: X{}}},
 		{`[a.b]
 c = 1
 
 [a]
-d = 2`, nil, &testStruct{},
+d = 2`, nil,
 			&testStruct{
 				A: struct {
 					D int
@@ -731,42 +719,9 @@ d = 2`, nil, &testStruct{},
 					},
 				},
 			}},
-		{`# DO NOT DO THIS
-
-[a]
-b = 1
-
-[a]
-c = 2`, lineError(6, fmt.Errorf("table `a' is in conflict with normal table in line 3")), &testStruct{}, &testStruct{}},
-		{`# DO NOT DO THIS EITHER
-
-[a]
-b = 1
-
-[a.b]
-c = 2`, lineError(6, fmt.Errorf("key `b' is in conflict with line 4")), &testStruct{}, &testStruct{}},
-		{`# DO NOT DO THIS EITHER
-
-[a.b]
-c = 2
-
-[a]
-b = 1`, lineError(7, fmt.Errorf("key `b' is in conflict with normal table in line 3")), &testStruct{}, &testStruct{}},
-		{`[]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`[a.]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`[a..b]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`[.b]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`[.]`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{` = "no key name" # not allowed`, lineError(1, errParse), &testStruct{}, &testStruct{}},
-		{`[servers]
-[servers.alpha]
-ip = "10.0.0.1"
-dc = "eqdc10"
-[servers.beta]
-ip = "10.0.0.2"
-dc = "eqdc10"
-`, nil, &testStructWithMap{},
-			&testStructWithMap{
+		{
+			data: string(loadTestData("unmarshal-table-withmap.toml")),
+			expect: &testStructWithMap{
 				Servers: map[string]struct {
 					IP string
 					DC string
@@ -780,12 +735,40 @@ dc = "eqdc10"
 						DC: "eqdc10",
 					},
 				},
-			}},
-		{`
+			},
+		},
+
+		// errors
+		{
+			data:   string(loadTestData("unmarshal-table-conflict-1.toml")),
+			err:    lineError(7, fmt.Errorf("table `a' is in conflict with normal table in line 4")),
+			expect: &testStruct{},
+		},
+		{
+			data:   string(loadTestData("unmarshal-table-conflict-2.toml")),
+			err:    lineError(7, fmt.Errorf("key `b' is in conflict with line 5")),
+			expect: &testStruct{},
+		},
+		{
+			data:   string(loadTestData("unmarshal-table-conflict-3.toml")),
+			err:    lineError(8, fmt.Errorf("key `b' is in conflict with normal table in line 4")),
+			expect: &testStruct{},
+		},
+		{`[]`, lineError(1, errParse), &testStruct{}},
+		{`[a.]`, lineError(1, errParse), &testStruct{}},
+		{`[a..b]`, lineError(1, errParse), &testStruct{}},
+		{`[.b]`, lineError(1, errParse), &testStruct{}},
+		{`[.]`, lineError(1, errParse), &testStruct{}},
+		{` = "no key name" # not allowed`, lineError(1, errParse), &testStruct{}},
+		{
+			data: `
 [a]
 d = 2
 y = 3
-        `, lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")), &testStruct{}, &testStruct{}},
+        `,
+			err:    lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")),
+			expect: &testStruct{},
+		},
 	})
 }
 
@@ -817,54 +800,29 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 		}
 	}
 	testUnmarshal(t, []testcase{
-		{`[[products]]
-		name = "Hammer"
-		sku = 738594937
-
-		[[products]]
-
-		[[products]]
-		name = "Nail"
-		sku = 284758393
-		color = "gray"`, nil, &testStruct{},
-			&testStruct{
+		{
+			data: string(loadTestData("unmarshal-arraytable.toml")),
+			expect: &testStruct{
 				Products: []Product{
 					{Name: "Hammer", SKU: 738594937},
 					{},
 					{Name: "Nail", SKU: 284758393, Color: "gray"},
 				},
-			}},
-		{`products = [{name = "Hammer", sku = 738594937}, {},
-{name = "Nail", sku = 284758393, color = "gray"}]`, nil, &testStruct{}, &testStruct{
-			Products: []Product{
-				{Name: "Hammer", SKU: 738594937},
-				{},
-				{Name: "Nail", SKU: 284758393, Color: "gray"},
 			},
-		}},
-		{`[[fruit]]
-		name = "apple"
-
-		[fruit.physical]
-		color = "red"
-		shape = "round"
-
-		[[fruit.variety]]
-		name = "red delicious"
-
-		[[fruit.variety]]
-		name = "granny smith"
-
-		[[fruit]]
-		name = "banana"
-
-		[fruit.physical]
-		color = "yellow"
-		shape = "lune"
-
-		[[fruit.variety]]
-		name = "plantain"`, nil, &testStruct{},
-			&testStruct{
+		},
+		{
+			data: string(loadTestData("unmarshal-arraytable-inline.toml")),
+			expect: &testStruct{
+				Products: []Product{
+					{Name: "Hammer", SKU: 738594937},
+					{},
+					{Name: "Nail", SKU: 284758393, Color: "gray"},
+				},
+			},
+		},
+		{
+			data: string(loadTestData("unmarshal-arraytable-nested-1.toml")),
+			expect: &testStruct{
 				Fruit: []Fruit{
 					{
 						Name: "apple",
@@ -888,23 +846,11 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 						},
 					},
 				},
-			}},
-		{`[[fruit]]
-
-		[[fruit.variety]]
-		name = "red delicious"
-
-		[[fruit.variety]]
-		name = "granny smith"
-
-		[[fruit]]
-
-		[[fruit.variety]]
-		name = "plantain"
-
-		[[fruit.area]]
-		name = "phillippines"`, nil, &testStructWithMap{},
-			&testStructWithMap{
+			},
+		},
+		{
+			data: string(loadTestData("unmarshal-arraytable-nested-2.toml")),
+			expect: &testStructWithMap{
 				Fruit: []map[string][]struct {
 					Name string
 				}{
@@ -923,27 +869,19 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 						},
 					},
 				},
-			}},
-		{`# INVALID TOML DOC
-		[[fruit]]
-		name = "apple"
-
-		[[fruit.variety]]
-		name = "red delicious"
-
-		# This table conflicts with the previous table
-		[fruit.variety]
-		name = "granny smith"`, lineError(9, fmt.Errorf("table `fruit.variety' is in conflict with array table in line 5")), &testStruct{}, &testStruct{}},
-		{`# INVALID TOML DOC
-		[[fruit]]
-		name = "apple"
-
-		[fruit.variety]
-		name = "granny smith"
-
-		# This table conflicts with the previous table
-		[[fruit.variety]]
-		name = "red delicious"`, lineError(9, fmt.Errorf("table `fruit.variety' is in conflict with normal table in line 5")), &testStruct{}, &testStruct{}},
+			},
+		},
+		// errors
+		{
+			data:   string(loadTestData("unmarshal-arraytable-conflict-1.toml")),
+			err:    lineError(10, fmt.Errorf("table `fruit.variety' is in conflict with array table in line 6")),
+			expect: &testStruct{},
+		},
+		{
+			data:   string(loadTestData("unmarshal-arraytable-conflict-2.toml")),
+			err:    lineError(10, fmt.Errorf("table `fruit.variety' is in conflict with normal table in line 6")),
+			expect: &testStruct{},
+		},
 	})
 }
 
@@ -1041,8 +979,7 @@ func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
 
 	tests := []testcase{
 		{
-			data:   string(loadTestData("unmarshal-textunmarshaler.toml")),
-			actual: &testStruct{},
+			data: string(loadTestData("unmarshal-textunmarshaler.toml")),
 			expect: &testStruct{
 				Str:        "Unmarshaled: str",
 				Int:        "Unmarshaled: 11",
@@ -1052,7 +989,6 @@ func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
 		},
 		{
 			data:   `str = "error"`,
-			actual: &testStruct{},
 			expect: &testStruct{Str: "Unmarshaled: error"},
 			err:    lineErrorField(1, "toml.testStruct.Str", errTextUnmarshaler),
 		},
@@ -1155,17 +1091,6 @@ func TestUnmarshal_WithPointers(t *testing.T) {
 		Inline ***Inline
 		Tables []***Table
 	}
-	data := `
-inline = { key1 = "test", key2 = "a", key3 = "b" }
-[[tables]]
-key1 = "a"
-key2 = "a"
-key3 = "a"
-[[tables]]
-key1 = "b"
-key2 = "b"
-key3 = "b"
-`
 	s1 := "a"
 	s2 := &s1
 	s3 := &s2
@@ -1184,20 +1109,21 @@ key3 = "b"
 	sc := &testStruct{
 		Inline: i1, Tables: []*Table{t1, t2},
 	}
-	ac := &testStruct{}
+	data := string(loadTestData("unmarshal-pointer.toml"))
 	testUnmarshal(t, []testcase{
-		{data, nil, ac, sc},
-		{data, nil, &testStruct2{}, &testStruct2{
+		{data, nil, sc},
+		{data, nil, &testStruct2{
 			Inline: i2,
 			Tables: []**Table{&t1, &t2},
 		}},
-		{data, nil, &testStruct3{}, &testStruct3{
+		{data, nil, &testStruct3{
 			Inline: i3,
 			Tables: []***Table{&t3, &t4},
 		}},
 	})
 }
 
+// This test checks that maps can be unmarshaled into directly.
 func TestUnmarshalMap(t *testing.T) {
 	testUnmarshal(t, []testcase{
 		{
@@ -1205,35 +1131,30 @@ func TestUnmarshalMap(t *testing.T) {
 name = "evan"
 foo = 1
 `,
-			actual: map[string]interface{}{},
 			expect: map[string]interface{}{"name": "evan", "foo": int64(1)},
 		},
 		{
 			data: `[p]
 first = "evan"
 `,
-			actual: map[string]*Name{},
 			expect: map[string]*Name{"p": {First: "evan"}},
 		},
 		{
 			data: `foo = 1
 bar = 2
 `,
-			actual: map[testTextUnmarshaler]int{},
 			expect: map[testTextUnmarshaler]int{"Unmarshaled: foo": 1, "Unmarshaled: bar": 2},
 		},
 		{
 			data: `1 = 1
 -2 = 2
 `,
-			actual: map[int]int{},
 			expect: map[int]int{1: 1, -2: 2},
 		},
 		{
 			data: `1 = 1
 -129 = 2
 `,
-			actual: map[int8]int{},
 			expect: map[int8]int{1: 1},
 			err:    lineError(2, &overflowError{reflect.Int8, "-129"}),
 		},
@@ -1249,11 +1170,12 @@ func TestUnmarshal_WithQuotedKeyValue(t *testing.T) {
 	}
 
 	testUnmarshal(t, []testcase{
-		{`
+		{
+			data: `
 [table]
 "some.key" = {truthy = true}
-`, nil, &testStruct{},
-			&testStruct{Table: map[string]nestedStruct{
+`,
+			expect: &testStruct{Table: map[string]nestedStruct{
 				"some.key": {Truthy: true},
 			}},
 		},
@@ -1278,6 +1200,6 @@ i = 1
 b = true
 `
 	testUnmarshal(t, []testcase{
-		{input, nil, &X{}, &X{"string", 1, true}},
+		{input, nil, &X{"string", 1, true}},
 	})
 }
