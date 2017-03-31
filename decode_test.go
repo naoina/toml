@@ -315,7 +315,7 @@ func testUnmarshal(t *testing.T, testcases []testcase) {
 		if !reflect.DeepEqual(err, v.err) {
 			t.Errorf("Error mismatch for input:\n%s\ngot: %+v\nwant: %+v", v.data, err, v.err)
 		}
-		if !reflect.DeepEqual(v.actual, v.expect) {
+		if err == nil && !reflect.DeepEqual(v.actual, v.expect) {
 			t.Errorf("Unmarshal value mismatch for input:\n%s\ndiff:\n%s", v.data, pretty.Compare(v.actual, v.expect))
 		}
 	}
@@ -797,7 +797,7 @@ dc = "eqdc10"
 [a]
 d = 2
 y = 3
-        `, lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")), &testStruct{}, &testStruct{A: A{D: 2}}},
+        `, lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")), &testStruct{}, &testStruct{}},
 	})
 }
 
