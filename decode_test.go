@@ -617,6 +617,12 @@ func TestUnmarshal_WithTable(t *testing.T) {
 	type X struct {
 		Y Y
 	}
+	type A struct {
+		D int
+		B struct {
+			C int
+		}
+	}
 	type testStruct struct {
 		Table struct {
 			Key string
@@ -625,12 +631,7 @@ func TestUnmarshal_WithTable(t *testing.T) {
 			Tater struct{}
 		}
 		X X
-		A struct {
-			D int
-			B struct {
-				C int
-			}
-		}
+		A A
 	}
 	type testQuotedKeyStruct struct {
 		Dog struct {
@@ -792,6 +793,11 @@ dc = "eqdc10"
 					},
 				},
 			}},
+		{`
+[a]
+d = 2
+y = 3
+        `, lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")), &testStruct{}, &testStruct{A: A{D: 2}}},
 	})
 }
 

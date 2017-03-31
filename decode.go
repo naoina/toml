@@ -125,7 +125,10 @@ func unmarshalTableOrValue(rv reflect.Value, av interface{}) error {
 
 	switch av.(type) {
 	case *ast.KeyValue, *ast.Table, []*ast.Table:
-		return unmarshalField(rv, av)
+		if err := unmarshalField(rv, av); err != nil {
+			return lineError(fieldLineNumber(av), err)
+		}
+		return nil
 	case ast.Value:
 		return setValue(rv, av.(ast.Value))
 	default:
@@ -144,13 +147,13 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 	}
 	switch rv.Kind() {
 	case reflect.Struct:
-		for key, astVal := range t.Fields {
+		for key, fieldAst := range t.Fields {
 			fv, fieldName, found := findField(rv, key)
 			if !found {
-				return lineError(t.Line, fmt.Errorf("field corresponding to `%s' is not defined in %v", fieldName, rv.Type()))
+				return lineError(fieldLineNumber(fieldAst), fmt.Errorf("field corresponding to '%s' is not defined in %v", key, rv.Type()))
 			}
-			if err := unmarshalField(fv, astVal); err != nil {
-				return lineErrorField(t.Line, rv.Type().String()+"."+fieldName, err)
+			if err := unmarshalField(fv, fieldAst); err != nil {
+				return lineErrorField(fieldLineNumber(fieldAst), rv.Type().String()+"."+fieldName, err)
 			}
 		}
 	case reflect.Map: // TODO: reflect.Interface
@@ -159,10 +162,10 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 			m = reflect.MakeMap(rv.Type())
 		}
 		elemtyp := rv.Type().Elem()
-		for key, astVal := range t.Fields {
+		for key, fieldAst := range t.Fields {
 			fv := reflect.New(elemtyp).Elem()
-			if err := unmarshalField(fv, astVal); err != nil {
-				return lineError(t.Line, err)
+			if err := unmarshalField(fv, fieldAst); err != nil {
+				return lineError(fieldLineNumber(fieldAst), err)
 			}
 			m.SetMapIndex(reflect.ValueOf(key), fv)
 		}
@@ -175,14 +178,23 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 	return nil
 }
 
+func fieldLineNumber(fieldAst interface{}) int {
+	switch av := fieldAst.(type) {
+	case *ast.KeyValue:
+		return av.Line
+	case *ast.Table:
+		return av.Line
+	case []*ast.Table:
+		return av[0].Line
+	default:
+		panic(fmt.Sprintf("BUG: unhandled node type %T", fieldAst))
+	}
+}
+
 func unmarshalField(rv reflect.Value, fieldAst interface{}) error {
 	switch av := fieldAst.(type) {
 	case *ast.KeyValue:
-		err := setValue(rv, av.Value)
-		if err != nil {
-			err = lineError(av.Line, err)
-		}
-		return err
+		return setValue(rv, av.Value)
 	case *ast.Table:
 		return unmarshalTable(rv, av, false)
 	case []*ast.Table:
@@ -191,7 +203,7 @@ func unmarshalField(rv reflect.Value, fieldAst interface{}) error {
 			return err
 		}
 		if rv.Kind() != reflect.Slice {
-			return lineError(av[0].Line, &unmarshalTypeError{"array table", "slice", rv.Type()})
+			return &unmarshalTypeError{"array table", "slice", rv.Type()}
 		}
 		slice := reflect.MakeSlice(rv.Type(), len(av), len(av))
 		for i, tbl := range av {
