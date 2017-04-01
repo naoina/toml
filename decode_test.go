@@ -880,34 +880,6 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 				},
 			},
 		},
-		{
-			data: string(loadTestData("unmarshal-arraytable-nested-1.toml")),
-			expect: map[string]interface{}{
-				"fruit": []interface{}{
-					map[string]interface{}{
-						"name": "apple",
-						"physical": map[string]interface{}{
-							"color": "red",
-							"shape": "round",
-						},
-						"variety": []interface{}{
-							map[string]interface{}{"name": "red delicious"},
-							map[string]interface{}{"name": "granny smith"},
-						},
-					},
-					map[string]interface{}{
-						"name": "banana",
-						"physical": map[string]interface{}{
-							"color": "yellow",
-							"shape": "lune",
-						},
-						"variety": []interface{}{
-							map[string]interface{}{"name": "plantain"},
-						},
-					},
-				},
-			},
-		},
 
 		// errors
 		{
@@ -1239,5 +1211,40 @@ b = true
 `
 	testUnmarshal(t, []testcase{
 		{input, nil, &X{"string", 1, true}},
+	})
+}
+
+func TestUnmarshal_WithInterface(t *testing.T) {
+	var exp interface{} = map[string]interface{}{
+		"string":   "string",
+		"int":      int64(3),
+		"float":    float64(4),
+		"boolean":  true,
+		"datetime": mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00.999999-07:00")),
+		"array":    []interface{}{int64(1), int64(2), int64(3)},
+		"inline":   map[string]interface{}{"key": "value"},
+		"table":    map[string]interface{}{"key": "value"},
+		"arraytable": []interface{}{
+			map[string]interface{}{"key": "value"},
+			map[string]interface{}{"key": "value"},
+		},
+	}
+
+	type nonemptyIf interface {
+		method()
+	}
+	nonemptyIfType := reflect.TypeOf((*nonemptyIf)(nil)).Elem()
+
+	data := string(loadTestData("unmarshal-interface.toml"))
+	testUnmarshal(t, []testcase{
+		{data, nil, &exp},
+		// can't unmarshal into non-empty interface{}
+		{`v = "string"`, lineError(1, &unmarshalTypeError{"string", "", nonemptyIfType}), map[string]nonemptyIf{}},
+		{`v = 1`, lineError(1, &unmarshalTypeError{"integer", "", nonemptyIfType}), map[string]nonemptyIf{}},
+		{`v = 1.0`, lineError(1, &unmarshalTypeError{"float", "", nonemptyIfType}), map[string]nonemptyIf{}},
+		{`v = true`, lineError(1, &unmarshalTypeError{"boolean", "", nonemptyIfType}), map[string]nonemptyIf{}},
+		{`v = [1, 2]`, lineError(1, &unmarshalTypeError{"array", "slice", nonemptyIfType}), map[string]nonemptyIf{}},
+		{`[v]`, lineError(1, &unmarshalTypeError{"table", "struct or map", nonemptyIfType}), map[string]nonemptyIf{}},
+		{`[[v]]`, lineError(1, &unmarshalTypeError{"array table", "slice", nonemptyIfType}), map[string]nonemptyIf{}},
 	})
 }
