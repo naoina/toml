@@ -118,7 +118,7 @@ timeOffset <- 'Z' / timeNumoffset
 partialTime <- timeHour ':' timeMinute ':' timeSecond timeSecfrac?
 fullDate <- dateFullYear '-' dateMonth '-' dateMDay
 fullTime <- partialTime timeOffset
-datetime <- fullDate 'T' fullTime
+datetime <- (fullDate ('T' fullTime)?) / partialTime
 
 digit <- [0-9]
 digitDual <- digit digit

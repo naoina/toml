@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/naoina/toml/ast"
 )
@@ -28,6 +29,8 @@ var (
 		"_", "",
 	)
 )
+
+var timeType = reflect.TypeOf(time.Time{})
 
 // Unmarshal parses the TOML data and stores the result in the value pointed to by v.
 //
@@ -276,10 +279,10 @@ func setValue(lhs reflect.Value, val ast.Value) error {
 		return setString(lhs, v)
 	case *ast.Boolean:
 		return setBoolean(lhs, v)
+	case *ast.Datetime:
+		return setDatetime(lhs, v)
 	case *ast.Array:
 		return setArray(lhs, v)
-	case *ast.Datetime:
-		panic("*ast.Datetime should be handled by TextUnmarshaler")
 	default:
 		panic(fmt.Sprintf("BUG: unhandled node type %T", v))
 	}
@@ -333,7 +336,7 @@ func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
 		return nil, false
 	}
 	u, ok := lhs.Addr().Interface().(encoding.TextUnmarshaler)
-	if !ok {
+	if !ok || lhs.Type() == timeType {
 		return nil, false
 	}
 	var data string
@@ -416,6 +419,18 @@ func setBoolean(fv reflect.Value, v *ast.Boolean) error {
 	default:
 		return &unmarshalTypeError{"boolean", "", fv.Type()}
 	}
+	return nil
+}
+
+func setDatetime(rv reflect.Value, v *ast.Datetime) error {
+	t, err := v.Time()
+	if err != nil {
+		return err
+	}
+	if !timeType.AssignableTo(rv.Type()) {
+		return &unmarshalTypeError{"datetime", "", rv.Type()}
+	}
+	rv.Set(reflect.ValueOf(t))
 	return nil
 }
 
