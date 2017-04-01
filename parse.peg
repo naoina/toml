@@ -126,13 +126,20 @@ digitQuad <- digitDual digitDual
 
 array <- (
     '[' { p.StartArray() }
-    wsnl arrayValues wsnl
+    wsnl arrayValues? wsnl
     ']'
 )
 
 arrayValues <- (
     val { p.AddArrayVal() }
-    arraySep? (comment? newline)?
-)*
+    (
+        wsnl comment?
+        wsnl arraySep
+        wsnl comment?
+        wsnl val { p.AddArrayVal() }
+    )*
+    wsnl arraySep?
+    wsnl comment?
+)
 
-arraySep <- ws ',' wsnl
+arraySep <- ','

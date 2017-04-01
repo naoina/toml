@@ -565,21 +565,18 @@ func TestUnmarshal_WithArray(t *testing.T) {
 			err:    lineErrorField(1, "toml.arrays.Ints", errArrayMultiType),
 			expect: &arrays{},
 		},
-		{
-			data: `key = [
-  1, 2, 3
-]`,
-			expect: &struct{ Key []int }{
-				[]int{1, 2, 3},
-			}},
-		{
-			data: `key = [
-  1,
-  2, # this is ok
-]`,
-			expect: &struct{ Key []int }{
-				[]int{1, 2},
-			}},
+		// whitespace + comments
+		{string(loadTestData("unmarshal-array-1.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
+		{string(loadTestData("unmarshal-array-2.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
+		{string(loadTestData("unmarshal-array-3.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
+		{string(loadTestData("unmarshal-array-4.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
+		{string(loadTestData("unmarshal-array-5.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
+		{string(loadTestData("unmarshal-array-6.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
+		// parse errors
+		{`ints = [ , ]`, lineError(1, errParse), &arrays{}},
+		{`ints = [ , 1 ]`, lineError(1, errParse), &arrays{}},
+		{`ints = [ 1 2 ]`, lineError(1, errParse), &arrays{}},
+		{`ints = [ 1 , , 2 ]`, lineError(1, errParse), &arrays{}},
 	})
 }
 
