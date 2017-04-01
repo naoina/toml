@@ -189,7 +189,7 @@ func TestMarshalRoundTrip(t *testing.T) {
 	if err := Unmarshal(b, &dest); err != nil {
 		t.Error("Unmarshal error:", err)
 	}
-	if !reflect.DeepEqual(theTestStruct(), dest) {
+	if !reflect.DeepEqual(theTestStruct(), &dest) {
 		t.Errorf("Unmarshaled value mismatch:\n%s", pretty.Compare(v, dest))
 	}
 }

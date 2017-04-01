@@ -167,8 +167,8 @@ type testStruct struct {
 	Fruit    []Fruit
 }
 
-func theTestStruct() testStruct {
-	return testStruct{
+func theTestStruct() *testStruct {
+	return &testStruct{
 		Table: Table{
 			Key: "value",
 			Subtable: Subtable{
@@ -286,20 +286,12 @@ func theTestStruct() testStruct {
 }
 
 func TestUnmarshal(t *testing.T) {
-	data := loadTestData("test.toml")
-
-	var v testStruct
-	var actual interface{} = Unmarshal(data, &v)
-	var expect interface{} = nil
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf(`toml.Unmarshal(data, &testStruct{}) => %#v; want %#v`, actual, expect)
-	}
-
-	actual = v
-	expect = theTestStruct()
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf(`toml.Unmarshal(data, v); v => %#v; want %#v`, actual, expect)
-	}
+	testUnmarshal(t, []testcase{
+		{
+			data:   string(loadTestData("test.toml")),
+			expect: theTestStruct(),
+		},
+	})
 }
 
 type testcase struct {
