@@ -91,20 +91,6 @@ func main() {
         panic(err)
     }
     defer f.Close()
-    buf, err := ioutil.ReadAll(f)
-    if err != nil {
-        panic(err)
-    }
-    var config tomlConfig
-    if err := toml.Unmarshal(buf, &config); err != nil {
-        panic(err)
-    }
-
-    f, err := os.Open("testdata/example.toml")
-    if err != nil {
-        panic(err)
-    }
-    defer f.Close()
     var config Config
     if err := toml.NewDecoder(f).Decode(&config); err != nil {
         panic(err)
