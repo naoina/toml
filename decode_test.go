@@ -315,7 +315,7 @@ func testUnmarshal(t *testing.T, testcases []testcase) {
 
 		err := Unmarshal([]byte(test.data), val)
 		if !reflect.DeepEqual(err, test.err) {
-			t.Errorf("Error mismatch for input:\n%s\ngot: %+v\nwant: %+v", test.data, err, test.err)
+			t.Errorf("Error mismatch for input:\n%s\ngot:  %+v\nwant: %+v", test.data, err, test.err)
 		}
 		if err == nil && !reflect.DeepEqual(val, test.expect) {
 			t.Errorf("Unmarshal value mismatch for input:\n%s\ndiff:\n%s", test.data, pretty.Compare(val, test.expect))
@@ -627,6 +627,10 @@ func TestUnmarshal_WithTable(t *testing.T) {
 			DC string
 		}
 	}
+	type withTableArray struct {
+		Tabarray []map[string]string
+	}
+
 	testUnmarshal(t, []testcase{
 		{`[table]`, nil, &testStruct{}},
 		{`[table]
@@ -724,32 +728,33 @@ d = 2`, nil,
 					IP string
 					DC string
 				}{
-					"alpha": {
-						IP: "10.0.0.1",
-						DC: "eqdc10",
-					},
-					"beta": {
-						IP: "10.0.0.2",
-						DC: "eqdc10",
-					},
+					"alpha": {IP: "10.0.0.1", DC: "eqdc10"},
+					"beta":  {IP: "10.0.0.2", DC: "eqdc10"},
 				},
+			},
+		},
+		{
+			data: string(loadTestData("unmarshal-table-withinline.toml")),
+			expect: map[string]withTableArray{
+				"tab1": {Tabarray: []map[string]string{{"key": "1"}}},
+				"tab2": {Tabarray: []map[string]string{{"key": "2"}}},
 			},
 		},
 
 		// errors
 		{
 			data:   string(loadTestData("unmarshal-table-conflict-1.toml")),
-			err:    lineError(7, fmt.Errorf("table `a' is in conflict with normal table in line 4")),
+			err:    lineError(7, fmt.Errorf("table `a' is in conflict with table in line 4")),
 			expect: &testStruct{},
 		},
 		{
 			data:   string(loadTestData("unmarshal-table-conflict-2.toml")),
-			err:    lineError(7, fmt.Errorf("key `b' is in conflict with line 5")),
+			err:    lineError(7, fmt.Errorf("table `a.b' is in conflict with line 5")),
 			expect: &testStruct{},
 		},
 		{
 			data:   string(loadTestData("unmarshal-table-conflict-3.toml")),
-			err:    lineError(8, fmt.Errorf("key `b' is in conflict with normal table in line 4")),
+			err:    lineError(8, fmt.Errorf("key `b' is in conflict with table in line 4")),
 			expect: &testStruct{},
 		},
 		{`[]`, lineError(1, errParse), &testStruct{}},
@@ -763,7 +768,7 @@ d = 2`, nil,
 [a]
 d = 2
 y = 3
-        `,
+`,
 			err:    lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")),
 			expect: &testStruct{},
 		},
@@ -852,20 +857,19 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 				Fruit: []map[string][]struct {
 					Name string
 				}{
-					{
-						"variety": {
-							{Name: "red delicious"},
-							{Name: "granny smith"},
-						},
-					},
-					{
-						"variety": {
-							{Name: "plantain"},
-						},
-						"area": {
-							{Name: "phillippines"},
-						},
-					},
+					{"variety": {{Name: "red delicious"}, {Name: "granny smith"}}},
+					{"variety": {{Name: "plantain"}}, "area": {{Name: "phillippines"}}},
+				},
+			},
+		},
+		{
+			data: string(loadTestData("unmarshal-arraytable-nested-3.toml")),
+			expect: &testStructWithMap{
+				Fruit: []map[string][]struct {
+					Name string
+				}{
+					{"variety": {{Name: "red delicious"}, {Name: "granny smith"}}},
+					{"variety": {{Name: "plantain"}}, "area": {{Name: "phillippines"}}},
 				},
 			},
 		},
@@ -878,7 +882,12 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 		},
 		{
 			data:   string(loadTestData("unmarshal-arraytable-conflict-2.toml")),
-			err:    lineError(10, fmt.Errorf("table `fruit.variety' is in conflict with normal table in line 6")),
+			err:    lineError(10, fmt.Errorf("array table `fruit.variety' is in conflict with table in line 6")),
+			expect: &testStruct{},
+		},
+		{
+			data:   string(loadTestData("unmarshal-arraytable-conflict-3.toml")),
+			err:    lineError(8, fmt.Errorf("array table `fruit.variety' is in conflict with table in line 5")),
 			expect: &testStruct{},
 		},
 	})

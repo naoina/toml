@@ -485,21 +485,15 @@ type toml struct {
 	key          string
 	val          ast.Value
 	arr          *array
-	tableMap     map[string]*ast.Table
 	stack        []*stack
 	skip         bool
 }
 
 func (p *toml) init(data []rune) {
 	p.line = 1
-	p.table = &ast.Table{
-		Line: p.line,
-		Type: ast.TableTypeNormal,
-		Data: data[:len(data)-1], // truncate the end_symbol added by PEG parse generator.
-	}
-	p.tableMap = map[string]*ast.Table{
-		"": p.table,
-	}
+	p.table = p.newTable(ast.TableTypeNormal, "")
+	p.table.Position.End = len(data) - 1
+	p.table.Data = data[:len(data)-1] // truncate the end_symbol added by PEG parse generator.
 	p.currentTable = p.table
 }
 
@@ -575,25 +569,48 @@ func (p *toml) SetTable(buf []rune, begin, end int) {
 	p.setTable(p.table, buf, begin, end)
 }
 
-func (p *toml) setTable(t *ast.Table, buf []rune, begin, end int) {
+func (p *toml) setTable(parent *ast.Table, buf []rune, begin, end int) {
 	name := string(buf[begin:end])
 	names := splitTableKey(name)
-	if t, exists := p.tableMap[name]; exists {
-		if lt := p.tableMap[names[len(names)-1]]; t.Type == ast.TableTypeArray || lt != nil && lt.Type == ast.TableTypeNormal {
-			p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.Type, t.Line))
-		}
-	}
-	t, err := p.lookupTable(t, names)
+	parent, err := p.lookupTable(parent, names[:len(names)-1])
 	if err != nil {
 		p.Error(err)
 	}
-	p.currentTable = t
-	p.tableMap[name] = p.currentTable
+	last := names[len(names)-1]
+	tbl := p.newTable(ast.TableTypeNormal, last)
+	switch v := parent.Fields[last].(type) {
+	case nil:
+		parent.Fields[last] = tbl
+	case []*ast.Table:
+		p.Error(fmt.Errorf("table `%s' is in conflict with array table in line %d", name, v[0].Line))
+	case *ast.Table:
+		if (v.Position == ast.Position{}) {
+			// This table was created as an implicit parent.
+			// Replace it with the real defined table.
+			tbl.Fields = v.Fields
+			parent.Fields[last] = tbl
+		} else {
+			p.Error(fmt.Errorf("table `%s' is in conflict with table in line %d", name, v.Line))
+		}
+	case *ast.KeyValue:
+		p.Error(fmt.Errorf("table `%s' is in conflict with line %d", name, v.Line))
+	default:
+		p.Error(fmt.Errorf("BUG: table `%s' is in conflict but it's unknown type `%T'", last, v))
+	}
+	p.currentTable = tbl
+}
+
+func (p *toml) newTable(typ ast.TableType, name string) *ast.Table {
+	return &ast.Table{
+		Line:   p.line,
+		Name:   name,
+		Type:   typ,
+		Fields: make(map[string]interface{}),
+	}
 }
 
 func (p *tomlParser) SetTableString(begin, end int) {
 	p.currentTable.Data = p.buffer[begin:end]
-
 	p.currentTable.Position.Begin = begin
 	p.currentTable.Position.End = end
 }
@@ -602,38 +619,28 @@ func (p *toml) SetArrayTable(buf []rune, begin, end int) {
 	p.setArrayTable(p.table, buf, begin, end)
 }
 
-func (p *toml) setArrayTable(t *ast.Table, buf []rune, begin, end int) {
+func (p *toml) setArrayTable(parent *ast.Table, buf []rune, begin, end int) {
 	name := string(buf[begin:end])
-	if t, exists := p.tableMap[name]; exists && t.Type == ast.TableTypeNormal {
-		p.Error(fmt.Errorf("table `%s' is in conflict with %v table in line %d", name, t.Type, t.Line))
-	}
 	names := splitTableKey(name)
-	t, err := p.lookupTable(t, names[:len(names)-1])
+	parent, err := p.lookupTable(parent, names[:len(names)-1])
 	if err != nil {
 		p.Error(err)
 	}
 	last := names[len(names)-1]
-	tbl := &ast.Table{
-		Position: ast.Position{begin, end},
-		Line:     p.line,
-		Name:     last,
-		Type:     ast.TableTypeArray,
-	}
-	switch v := t.Fields[last].(type) {
+	tbl := p.newTable(ast.TableTypeArray, last)
+	switch v := parent.Fields[last].(type) {
 	case nil:
-		if t.Fields == nil {
-			t.Fields = make(map[string]interface{})
-		}
-		t.Fields[last] = []*ast.Table{tbl}
+		parent.Fields[last] = []*ast.Table{tbl}
 	case []*ast.Table:
-		t.Fields[last] = append(v, tbl)
+		parent.Fields[last] = append(v, tbl)
+	case *ast.Table:
+		p.Error(fmt.Errorf("array table `%s' is in conflict with table in line %d", name, v.Line))
 	case *ast.KeyValue:
-		p.Error(fmt.Errorf("key `%s' is in conflict with line %d", last, v.Line))
+		p.Error(fmt.Errorf("array table `%s' is in conflict with line %d", name, v.Line))
 	default:
-		p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", last, v))
+		p.Error(fmt.Errorf("BUG: array table `%s' is in conflict but it's unknown type `%T'", name, v))
 	}
 	p.currentTable = tbl
-	p.tableMap[name] = p.currentTable
 }
 
 func (p *toml) StartInlineTable() {
@@ -671,21 +678,14 @@ func (p *toml) AddKeyValue() {
 	if val, exists := p.currentTable.Fields[p.key]; exists {
 		switch v := val.(type) {
 		case *ast.Table:
-			p.Error(fmt.Errorf("key `%s' is in conflict with %v table in line %d", p.key, v.Type, v.Line))
+			p.Error(fmt.Errorf("key `%s' is in conflict with table in line %d", p.key, v.Line))
 		case *ast.KeyValue:
-			p.Error(fmt.Errorf("key `%s' is in conflict with line %d", p.key, v.Line))
+			p.Error(fmt.Errorf("key `%s' is in conflict with line %xd", p.key, v.Line))
 		default:
 			p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", p.key, v))
 		}
 	}
-	if p.currentTable.Fields == nil {
-		p.currentTable.Fields = make(map[string]interface{})
-	}
-	p.currentTable.Fields[p.key] = &ast.KeyValue{
-		Key:   p.key,
-		Value: p.val,
-		Line:  p.line,
-	}
+	p.currentTable.Fields[p.key] = &ast.KeyValue{Key: p.key, Value: p.val, Line: p.line}
 }
 
 func (p *toml) SetBasicString(buf []rune, begin, end int) {
@@ -720,14 +720,7 @@ func (p *toml) lookupTable(t *ast.Table, keys []string) (*ast.Table, error) {
 	for _, s := range keys {
 		val, exists := t.Fields[s]
 		if !exists {
-			tbl := &ast.Table{
-				Line: p.line,
-				Name: s,
-				Type: ast.TableTypeNormal,
-			}
-			if t.Fields == nil {
-				t.Fields = make(map[string]interface{})
-			}
+			tbl := p.newTable(ast.TableTypeNormal, s)
 			t.Fields[s] = tbl
 			t = tbl
 			continue
