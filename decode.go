@@ -1,3 +1,6 @@
+// Package toml encodes and decodes the TOML configuration format using reflection.
+//
+// This library is compatible with TOML version v0.4.0.
 package toml
 
 import (

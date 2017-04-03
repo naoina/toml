@@ -73,15 +73,15 @@ type tomlConfig struct {
         ConnectionMax uint
         Enabled       bool
     }
-    Servers map[string]Server
+    Servers map[string]ServerInfo
     Clients struct {
         Data  [][]interface{}
         Hosts []string
     }
 }
 
-type Server struct {
-    IP string
+type ServerInfo struct {
+    IP net.IP
     DC string
 }
 
@@ -99,7 +99,19 @@ func main() {
     if err := toml.Unmarshal(buf, &config); err != nil {
         panic(err)
     }
+
+    f, err := os.Open("testdata/example.toml")
+    if err != nil {
+        panic(err)
+    }
+    defer f.Close()
+    var config Config
+    if err := toml.NewDecoder(f).Decode(&config); err != nil {
+        panic(err)
+    }
+
     // then to use the unmarshaled config...
+    fmt.Println("IP of server 'alpha':", config.Servers["alpha"].IP)
 }
 ```
 
