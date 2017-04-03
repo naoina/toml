@@ -245,7 +245,7 @@ func (b *tableBuf) value(rv reflect.Value, name string) (bool, error) {
 		b.body = strconv.AppendBool(b.body, rv.Bool())
 	case reflect.String:
 		b.body = strconv.AppendQuote(b.body, rv.String())
-	case reflect.Ptr:
+	case reflect.Ptr, reflect.Interface:
 		if rv.IsNil() {
 			return false, &marshalNilError{rv.Type()}
 		}
@@ -289,8 +289,6 @@ func (b *tableBuf) value(rv reflect.Value, name string) (bool, error) {
 		err := child.mapFields(rv)
 		b.addChild(child)
 		return true, err
-	case reflect.Interface:
-		return b.value(rv.Elem(), name)
 	default:
 		return false, fmt.Errorf("toml: marshal: unsupported type %v", rv.Kind())
 	}
