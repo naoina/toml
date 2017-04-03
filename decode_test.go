@@ -772,6 +772,12 @@ d = 2`, nil,
 			expect: &testIgnoredFieldStruct{},
 		},
 		{
+			data:   `"-" = "value"`,
+			err:    lineError(1, fmt.Errorf("field corresponding to `\"-\"' is not defined in toml.testIgnoredFieldStruct")),
+			expect: &testIgnoredFieldStruct{},
+		},
+
+		{
 			data: `
 [a]
 d = 2
