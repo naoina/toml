@@ -39,9 +39,7 @@ func lineError(line int, err error) error {
 
 func lineErrorField(line int, field string, err error) error {
 	if lerr, ok := err.(*LineError); ok {
-		if lerr.StructField == "" {
-			lerr.StructField = field
-		}
+		return lerr
 	} else if err != nil {
 		err = &LineError{Line: line, StructField: field, Err: err}
 	}

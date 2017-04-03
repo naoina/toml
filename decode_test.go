@@ -783,7 +783,7 @@ d = 2`, nil,
 d = 2
 y = 3
 `,
-			err:    lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to `y' is not defined in toml.A")),
+			err:    lineError(4, fmt.Errorf("field corresponding to `y' is not defined in toml.A")),
 			expect: &testStruct{},
 		},
 	})
