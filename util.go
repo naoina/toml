@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"unicode"
@@ -34,15 +35,19 @@ const (
 	fieldTagName = "toml"
 )
 
-func findField(rv reflect.Value, name string) (field reflect.Value, fieldName string, found bool) {
+func findField(rv reflect.Value, name string) (field reflect.Value, fieldName string, err error) {
 	rt := rv.Type()
 	for i := 0; i < rt.NumField(); i++ {
 		ft := rt.Field(i)
 		if ft.PkgPath != "" && !ft.Anonymous {
 			continue
 		}
-		if col, _ := extractTag(ft.Tag.Get(fieldTagName)); col == name {
-			return rv.Field(i), ft.Name, true
+		col, _ := extractTag(ft.Tag.Get(fieldTagName))
+		if col == "-" {
+			return field, "", fmt.Errorf("field corresponding to `%s' in %v cannot be set through TOML", name, rv.Type())
+		}
+		if col == name {
+			return rv.Field(i), ft.Name, nil
 		}
 	}
 	for _, name := range []string{
@@ -51,10 +56,10 @@ func findField(rv reflect.Value, name string) (field reflect.Value, fieldName st
 		strings.ToUpper(name),
 	} {
 		if field := rv.FieldByName(name); field.IsValid() {
-			return field, name, true
+			return field, name, nil
 		}
 	}
-	return field, "", false
+	return field, "", fmt.Errorf("field corresponding to `%s' is not defined in %v", name, rv.Type())
 }
 
 func extractTag(tag string) (col, rest string) {

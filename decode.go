@@ -154,9 +154,9 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 	switch {
 	case rv.Kind() == reflect.Struct:
 		for key, fieldAst := range t.Fields {
-			fv, fieldName, found := findField(rv, key)
-			if !found {
-				return lineError(fieldLineNumber(fieldAst), fmt.Errorf("field corresponding to '%s' is not defined in %v", key, rv.Type()))
+			fv, fieldName, err := findField(rv, key)
+			if err != nil {
+				return lineError(fieldLineNumber(fieldAst), err)
 			}
 			if err := unmarshalField(fv, fieldAst); err != nil {
 				return lineErrorField(fieldLineNumber(fieldAst), rv.Type().String()+"."+fieldName, err)

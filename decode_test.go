@@ -607,6 +607,9 @@ func TestUnmarshal_WithTable(t *testing.T) {
 		X X
 		A A
 	}
+	type testIgnoredFieldStruct struct {
+		Ignored string `toml:"-"`
+	}
 	type testQuotedKeyStruct struct {
 		Dog struct {
 			TaterMan struct {
@@ -764,12 +767,17 @@ d = 2`, nil,
 		{`[.]`, lineError(1, errParse), &testStruct{}},
 		{` = "no key name" # not allowed`, lineError(1, errParse), &testStruct{}},
 		{
+			data:   `ignored = "value"`,
+			err:    lineError(1, fmt.Errorf("field corresponding to `ignored' in toml.testIgnoredFieldStruct cannot be set through TOML")),
+			expect: &testIgnoredFieldStruct{},
+		},
+		{
 			data: `
 [a]
 d = 2
 y = 3
 `,
-			err:    lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to 'y' is not defined in toml.A")),
+			err:    lineErrorField(4, "toml.testStruct.A", fmt.Errorf("field corresponding to `y' is not defined in toml.A")),
 			expect: &testStruct{},
 		},
 	})
