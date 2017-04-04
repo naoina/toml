@@ -153,8 +153,9 @@ func unmarshalTable(rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 	}
 	switch {
 	case rv.Kind() == reflect.Struct:
+		fc := makeFieldCache(rv.Type())
 		for key, fieldAst := range t.Fields {
-			fv, fieldName, err := findField(rv, key)
+			fv, fieldName, err := fc.findField(rv, key)
 			if err != nil {
 				return lineError(fieldLineNumber(fieldAst), err)
 			}

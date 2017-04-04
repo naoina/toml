@@ -4,64 +4,49 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"unicode"
 )
 
-// toCamelCase returns a copy of the string s with all Unicode letters mapped to their camel case.
-// It will convert to upper case previous letter of '_' and first letter, and remove letter of '_'.
-func toCamelCase(s string) string {
-	if s == "" {
-		return ""
-	}
-	result := make([]rune, 0, len(s))
-	upper := false
-	for _, r := range s {
-		if r == '_' {
-			upper = true
-			continue
-		}
-		if upper {
-			result = append(result, unicode.ToUpper(r))
-			upper = false
-			continue
-		}
-		result = append(result, r)
-	}
-	result[0] = unicode.ToUpper(result[0])
-	return string(result)
+const fieldTagName = "toml"
+
+// fieldCache maps normalized field names to their position in a struct.
+type fieldCache map[string]fieldInfo
+
+type fieldInfo struct {
+	index   []int
+	name    string
+	ignored bool
 }
 
-const (
-	fieldTagName = "toml"
-)
-
-func matchField(fieldName, name string) bool {
-	return fieldName == strings.Title(name) ||
-		fieldName == toCamelCase(name) ||
-		fieldName == strings.ToUpper(name)
-}
-
-func findField(rv reflect.Value, name string) (field reflect.Value, fieldName string, err error) {
-	rt := rv.Type()
+func makeFieldCache(rt reflect.Type) fieldCache {
+	fc := make(fieldCache)
 	for i := 0; i < rt.NumField(); i++ {
 		ft := rt.Field(i)
 		// skip unexported fields
 		if ft.PkgPath != "" && !ft.Anonymous {
 			continue
 		}
-
 		col, _ := extractTag(ft.Tag.Get(fieldTagName))
-		if col != "-" && name == col {
-			return rv.Field(i), ft.Name, nil
+		key := col
+		if col == "" || col == "-" {
+			key = normFieldName(ft.Name)
 		}
-		if matchField(ft.Name, name) {
-			if col == "-" {
-				return field, "", fmt.Errorf("field corresponding to `%s' in %v cannot be set through TOML", name, rv.Type())
-			}
-			return rv.Field(i), ft.Name, nil
-		}
+		fc[key] = fieldInfo{index: ft.Index, name: ft.Name, ignored: col == "-"}
 	}
-	return field, "", fmt.Errorf("field corresponding to `%s' is not defined in %v", name, rv.Type())
+	return fc
+}
+
+func (fc fieldCache) findField(rv reflect.Value, name string) (reflect.Value, string, error) {
+	info, found := fc[normFieldName(name)]
+	if !found {
+		return reflect.Value{}, "", fmt.Errorf("field corresponding to `%s' is not defined in %v", name, rv.Type())
+	} else if info.ignored {
+		return reflect.Value{}, "", fmt.Errorf("field corresponding to `%s' in %v cannot be set through TOML", name, rv.Type())
+	}
+	return rv.FieldByIndex(info.index), info.name, nil
+}
+
+func normFieldName(s string) string {
+	return strings.Replace(strings.ToLower(s), "_", "", -1)
 }
 
 func extractTag(tag string) (col, rest string) {

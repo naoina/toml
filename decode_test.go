@@ -610,6 +610,9 @@ func TestUnmarshal_WithTable(t *testing.T) {
 	type testIgnoredFieldStruct struct {
 		Ignored string `toml:"-"`
 	}
+	type testNamedFieldStruct struct {
+		Named string `toml:"Named"`
+	}
 	type testQuotedKeyStruct struct {
 		Dog struct {
 			TaterMan struct {
@@ -776,7 +779,11 @@ d = 2`, nil,
 			err:    lineError(1, fmt.Errorf("field corresponding to `\"-\"' is not defined in toml.testIgnoredFieldStruct")),
 			expect: &testIgnoredFieldStruct{},
 		},
-
+		{
+			data:   `named = "value"`,
+			err:    lineError(1, fmt.Errorf("field corresponding to `named' is not defined in toml.testNamedFieldStruct")),
+			expect: &testNamedFieldStruct{},
+		},
 		{
 			data: `
 [a]
@@ -785,6 +792,32 @@ y = 3
 `,
 			err:    lineError(4, fmt.Errorf("field corresponding to `y' is not defined in toml.A")),
 			expect: &testStruct{},
+		},
+	})
+}
+
+func TestUnmarshal_WithEmbeddedStruct(t *testing.T) {
+	type TestEmbStructA struct {
+		A string
+	}
+	testUnmarshal(t, []testcase{
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				TestEmbStructA
+				A string
+			}{
+				A: "value",
+			},
+		},
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				A string
+				TestEmbStructA
+			}{
+				A: "value",
+			},
 		},
 	})
 }
