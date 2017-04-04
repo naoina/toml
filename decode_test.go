@@ -611,7 +611,7 @@ func TestUnmarshal_WithTable(t *testing.T) {
 		Ignored string `toml:"-"`
 	}
 	type testNamedFieldStruct struct {
-		Named string `toml:"Named"`
+		Named string `toml:"Named_Field"`
 	}
 	type testQuotedKeyStruct struct {
 		Dog struct {
@@ -727,6 +727,10 @@ d = 2`, nil,
 					},
 				},
 			}},
+		{
+			data:   `Named_Field = "value"`,
+			expect: &testNamedFieldStruct{Named: "value"},
+		},
 		{
 			data: string(loadTestData("unmarshal-table-withmap.toml")),
 			expect: &testStructWithMap{
