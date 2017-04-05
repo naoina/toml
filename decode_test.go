@@ -518,22 +518,22 @@ func TestUnmarshal_WithArray(t *testing.T) {
 		},
 		{`arrayval = [[1,2],[3,4,5]]`, nil, &struct{ Arrayval [][]int }{
 			[][]int{
-				[]int{1, 2},
-				[]int{3, 4, 5},
+				{1, 2},
+				{3, 4, 5},
 			},
 		}},
 		{`arrayval = [ [ 1, 2 ], ["a", "b", "c"] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{int64(1), int64(2)},
-					[]interface{}{"a", "b", "c"},
+					{int64(1), int64(2)},
+					{"a", "b", "c"},
 				},
 			}},
 		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6] ] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{int64(1), int64(2)},
-					[]interface{}{
+					{int64(1), int64(2)},
+					{
 						[]interface{}{int64(3), int64(4)},
 						[]interface{}{int64(5), int64(6)},
 					},
@@ -542,8 +542,8 @@ func TestUnmarshal_WithArray(t *testing.T) {
 		{`arrayval = [ [ 1, 2 ], [ [3, 4], [5, 6], [7, 8] ] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{int64(1), int64(2)},
-					[]interface{}{
+					{int64(1), int64(2)},
+					{
 						[]interface{}{int64(3), int64(4)},
 						[]interface{}{int64(5), int64(6)},
 						[]interface{}{int64(7), int64(8)},
@@ -553,11 +553,11 @@ func TestUnmarshal_WithArray(t *testing.T) {
 		{`arrayval = [ [[ 1, 2 ]], [3, 4], [5, 6] ] # this is ok`, nil,
 			&struct{ Arrayval [][]interface{} }{
 				[][]interface{}{
-					[]interface{}{
+					{
 						[]interface{}{int64(1), int64(2)},
 					},
-					[]interface{}{int64(3), int64(4)},
-					[]interface{}{int64(5), int64(6)},
+					{int64(3), int64(4)},
+					{int64(5), int64(6)},
 				},
 			}},
 		{
