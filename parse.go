@@ -13,7 +13,7 @@ import (
 
 //go:generate peg -switch -inline parse.peg
 
-var errParse = errors.New("parse error")
+var errParse = errors.New("invalid TOML syntax")
 
 // Parse returns an AST representation of TOML.
 // The toplevel is represented by a table.
