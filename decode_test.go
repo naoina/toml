@@ -780,7 +780,7 @@ d = 2`, nil,
 		},
 		{
 			data:   `"-" = "value"`,
-			err:    lineError(1, fmt.Errorf("field corresponding to `\"-\"' is not defined in toml.testIgnoredFieldStruct")),
+			err:    lineError(1, fmt.Errorf("field corresponding to `-' is not defined in toml.testIgnoredFieldStruct")),
 			expect: &testIgnoredFieldStruct{},
 		},
 		{
@@ -1193,6 +1193,24 @@ foo = 1
 			expect: map[string]interface{}{"name": "evan", "foo": int64(1)},
 		},
 		{
+			data: `[""]
+a = 1
+`,
+			expect: map[string]interface{}{"": map[string]interface{}{"a": int64(1)}},
+		},
+		{
+			data: `["table"]
+a = 1
+`,
+			expect: map[string]interface{}{"table": map[string]interface{}{"a": int64(1)}},
+		},
+		{
+			data: `["\u2222"]
+		a = 1
+		`,
+			expect: map[string]interface{}{"\u2222": map[string]interface{}{"a": int64(1)}},
+		},
+		{
 			data: `[p]
 first = "evan"
 `,
@@ -1204,6 +1222,13 @@ bar = 2
 `,
 			expect: map[testTextUnmarshaler]int{"Unmarshaled: foo": 1, "Unmarshaled: bar": 2},
 		},
+		{
+			data: `"foo" = 1
+"foo.bar" = 2
+`,
+			expect: map[testTextUnmarshaler]int{"Unmarshaled: foo": 1, "Unmarshaled: foo.bar": 2},
+		},
+
 		{
 			data: `1 = 1
 -2 = 2
@@ -1229,6 +1254,13 @@ func TestUnmarshal_WithQuotedKeyValue(t *testing.T) {
 	}
 
 	testUnmarshal(t, []testcase{
+		{data: `"a" = 1`, expect: map[string]int{"a": 1}},
+		{data: `"a.b" = 1`, expect: map[string]int{"a.b": 1}},
+		{data: `"\u2222" = 1`, expect: map[string]int{"\u2222": 1}},
+		{data: `"\"" = 1`, expect: map[string]int{"\"": 1}},
+		{data: `"" = 1`, expect: map[string]int{"": 1}},
+		{data: `'a' = 1`, expect: map[string]int{}, err: lineError(1, errParse)},
+		// Inline tables:
 		{
 			data: `
 [table]
@@ -1237,6 +1269,14 @@ func TestUnmarshal_WithQuotedKeyValue(t *testing.T) {
 			expect: &testStruct{Table: map[string]nestedStruct{
 				"some.key": {Truthy: true},
 			}},
+		},
+		{
+			data: `
+"some.key" = [{truthy = true}]
+`,
+			expect: map[string][]nestedStruct{
+				"some.key": {{Truthy: true}},
+			},
 		},
 	})
 }
