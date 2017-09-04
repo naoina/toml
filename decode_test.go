@@ -485,6 +485,9 @@ func TestUnmarshal_WithDatetime(t *testing.T) {
 		{`datetimeval = 1979-05-27T00:32:00-07:00`, nil, &testStruct{
 			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00-07:00")),
 		}},
+		{`datetimeval = 1979-05-27T00:32:00`, nil, &testStruct{
+			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00Z")),
+		}},
 		{`datetimeval = 1979-05-27T00:32:00.999999-07:00`, nil, &testStruct{
 			mustTime(time.Parse(time.RFC3339Nano, "1979-05-27T00:32:00.999999-07:00")),
 		}},
