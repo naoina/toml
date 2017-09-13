@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -164,6 +165,26 @@ var marshalTests = []struct {
 			},
 		},
 		expect: loadTestData("marshal-key-escape.toml"),
+	},
+	// empty interface with no type knowledge at compile time:
+	{
+		v: func() interface{} {
+			var (
+				v   = new(interface{})
+				err error
+			)
+
+			err = json.Unmarshal(
+				[]byte("{\"foo\":\"bar\"}"),
+				v,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			return v
+		}(),
+		expect: []byte("foo = \"bar\"\n"),
 	},
 }
 
