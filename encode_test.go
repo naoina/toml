@@ -2,7 +2,6 @@ package toml
 
 import (
 	"bytes"
-	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -169,20 +168,8 @@ var marshalTests = []struct {
 	// empty interface with no type knowledge at compile time:
 	{
 		v: func() interface{} {
-			var (
-				v   = new(interface{})
-				err error
-			)
-
-			err = json.Unmarshal(
-				[]byte("{\"foo\":\"bar\"}"),
-				v,
-			)
-			if err != nil {
-				panic(err)
-			}
-
-			return v
+			var v interface{} = map[string]interface{}{"foo": "bar"}
+			return &v
 		}(),
 		expect: []byte("foo = \"bar\"\n"),
 	},
