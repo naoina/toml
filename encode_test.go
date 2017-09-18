@@ -165,7 +165,7 @@ var marshalTests = []struct {
 		},
 		expect: loadTestData("marshal-key-escape.toml"),
 	},
-	// empty interface with no type knowledge at compile time:
+	// empty interface:
 	{
 		v: func() interface{} {
 			var v interface{} = map[string]interface{}{"foo": "bar"}
