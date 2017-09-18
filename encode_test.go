@@ -165,6 +165,14 @@ var marshalTests = []struct {
 		},
 		expect: loadTestData("marshal-key-escape.toml"),
 	},
+	// empty interface:
+	{
+		v: func() interface{} {
+			var v interface{} = map[string]interface{}{"foo": "bar"}
+			return &v
+		}(),
+		expect: []byte("foo = \"bar\"\n"),
+	},
 }
 
 func TestMarshal(t *testing.T) {
