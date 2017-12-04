@@ -22,20 +22,31 @@ type fieldInfo struct {
 
 func makeFieldCache(cfg *Config, rt reflect.Type) fieldCache {
 	named, auto := make(map[string]fieldInfo), make(map[string]fieldInfo)
-	for i := 0; i < rt.NumField(); i++ {
-		ft := rt.Field(i)
-		// skip unexported fields
-		if ft.PkgPath != "" && !ft.Anonymous {
-			continue
-		}
-		col, _ := extractTag(ft.Tag.Get(fieldTagName))
-		info := fieldInfo{index: ft.Index, name: ft.Name, ignored: col == "-"}
-		if col == "" || col == "-" {
-			auto[cfg.NormFieldName(rt, ft.Name)] = info
-		} else {
-			named[col] = info
+	var descend func(index []int, rt reflect.Type)
+	descend = func(index []int, rt reflect.Type) {
+		for i := 0; i < rt.NumField(); i++ {
+			ft := rt.Field(i)
+			// skip unexported fields
+			if ft.PkgPath != "" && !ft.Anonymous {
+				continue
+			}
+
+			col, _ := extractTag(ft.Tag.Get(fieldTagName))
+
+			if ft.Anonymous && ft.Type.Kind() == reflect.Struct && col == "" {
+				descend(append(index, ft.Index...), ft.Type)
+				continue
+			}
+
+			info := fieldInfo{index: append(index, ft.Index...), name: ft.Name, ignored: col == "-"}
+			if col == "" || col == "-" {
+				auto[cfg.NormFieldName(rt, ft.Name)] = info
+			} else {
+				named[col] = info
+			}
 		}
 	}
+	descend([]int{}, rt)
 	return fieldCache{named, auto}
 }
 
