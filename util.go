@@ -10,8 +10,8 @@ const fieldTagName = "toml"
 
 // fieldCache maps normalized field names to their position in a struct.
 type fieldCache struct {
-	named map[string]fieldInfo // fields with an explicit name in tag
-	auto  map[string]fieldInfo // fields with auto-assigned normalized names
+	named map[string]*fieldInfo // fields with an explicit name in tag
+	auto  map[string]*fieldInfo // fields with auto-assigned normalized names
 }
 
 type fieldInfo struct {
@@ -21,21 +21,42 @@ type fieldInfo struct {
 }
 
 func makeFieldCache(cfg *Config, rt reflect.Type) fieldCache {
-	named, auto := make(map[string]fieldInfo), make(map[string]fieldInfo)
-	for i := 0; i < rt.NumField(); i++ {
-		ft := rt.Field(i)
-		// skip unexported fields
-		if ft.PkgPath != "" && !ft.Anonymous {
-			continue
-		}
-		col, _ := extractTag(ft.Tag.Get(fieldTagName))
-		info := fieldInfo{index: ft.Index, name: ft.Name, ignored: col == "-"}
-		if col == "" || col == "-" {
-			auto[cfg.NormFieldName(rt, ft.Name)] = info
-		} else {
-			named[col] = info
+	named, auto := make(map[string]*fieldInfo), make(map[string]*fieldInfo)
+	var descend func(index []int, rt reflect.Type)
+	descend = func(index []int, rt reflect.Type) {
+		for i := 0; i < rt.NumField(); i++ {
+			ft := rt.Field(i)
+			// skip unexported fields
+			if ft.PkgPath != "" && !ft.Anonymous {
+				continue
+			}
+
+			col, _ := extractTag(ft.Tag.Get(fieldTagName))
+
+			if ft.Anonymous && ft.Type.Kind() == reflect.Struct && col == "" {
+				descend(append(index, ft.Index...), ft.Type)
+				continue
+			}
+
+			info := &fieldInfo{index: append(index, ft.Index...), name: ft.Name, ignored: col == "-"}
+			if col == "" || col == "-" {
+				name := cfg.NormFieldName(rt, ft.Name)
+				// discard any duplicate names
+				if v, ok := auto[name]; ok {
+					v.ignored = true
+					info.ignored = true
+				}
+				auto[name] = info
+			} else {
+				if v, ok := named[col]; ok {
+					v.ignored = true
+					info.ignored = true
+				}
+				named[col] = info
+			}
 		}
 	}
+	descend([]int{}, rt)
 	return fieldCache{named, auto}
 }
 
