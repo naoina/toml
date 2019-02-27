@@ -10,8 +10,8 @@ const fieldTagName = "toml"
 
 // fieldCache maps normalized field names to their position in a struct.
 type fieldCache struct {
-	named map[string]*fieldInfo // fields with an explicit name in tag
-	auto  map[string]*fieldInfo // fields with auto-assigned normalized names
+	named map[string]fieldInfo // fields with an explicit name in tag
+	auto  map[string]fieldInfo // fields with auto-assigned normalized names
 }
 
 type fieldInfo struct {
@@ -21,7 +21,7 @@ type fieldInfo struct {
 }
 
 func makeFieldCache(cfg *Config, rt reflect.Type) fieldCache {
-	named, auto := make(map[string]*fieldInfo), make(map[string]*fieldInfo)
+	named, auto := make(map[string]fieldInfo), make(map[string]fieldInfo)
 	var descend func(index []int, rt reflect.Type)
 	descend = func(index []int, rt reflect.Type) {
 		for i := 0; i < rt.NumField(); i++ {
@@ -38,7 +38,7 @@ func makeFieldCache(cfg *Config, rt reflect.Type) fieldCache {
 				continue
 			}
 
-			info := &fieldInfo{index: append(index, ft.Index...), name: ft.Name, ignored: col == "-"}
+			info := fieldInfo{index: append(index, ft.Index...), name: ft.Name, ignored: col == "-"}
 			if col == "" || col == "-" {
 				name := cfg.NormFieldName(rt, ft.Name)
 				// discard any duplicate names
