@@ -42,14 +42,12 @@ func makeFieldCache(cfg *Config, rt reflect.Type) fieldCache {
 			if col == "" || col == "-" {
 				name := cfg.NormFieldName(rt, ft.Name)
 				// discard any duplicate names
-				if v, ok := auto[name]; ok {
-					v.ignored = true
+				if _, ok := auto[name]; ok {
 					info.ignored = true
 				}
 				auto[name] = info
 			} else {
-				if v, ok := named[col]; ok {
-					v.ignored = true
+				if _, ok := named[col]; ok {
 					info.ignored = true
 				}
 				named[col] = info
