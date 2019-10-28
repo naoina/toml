@@ -54,7 +54,6 @@ Then above TOML will mapping to `tomlConfig` struct using `toml.Unmarshal`.
 package main
 
 import (
-    "io/ioutil"
     "os"
     "time"
 
