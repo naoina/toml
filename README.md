@@ -90,7 +90,7 @@ func main() {
         panic(err)
     }
     defer f.Close()
-    var config Config
+    var config tomlConfig
     if err := toml.NewDecoder(f).Decode(&config); err != nil {
         panic(err)
     }
