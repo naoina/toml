@@ -371,6 +371,14 @@ func TestUnmarshal_WithString(t *testing.T) {
 				Lines:  "The first newline is\ntrimmed in raw strings.\n   All other whitespace\n   is preserved.\n",
 			},
 		},
+		{
+			data: string(loadTestData("unmarshal-string-5.toml")),
+			expect: &testStruct{
+				Key1: `I dare to say "this is valid TOML", and I'm not joking`,
+				Key2: `I dare to say 'this is valid TOML', and I'm not joking`,
+				Key3: `I dare to say 'this is valid TOML', and I'm not joking`,
+			},
+		},
 	})
 }
 
@@ -451,7 +459,7 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = -10.2E5`, nil, &testStruct{-10.2e5}},
 		{`floatval = 5e+22`, nil, &testStruct{5e+22}},
 		{`floatval = 1e6`, nil, &testStruct{1e6}},
-		{`floatval = -2E-2`, nil, &testStruct{-2E-2}},
+		{`floatval = -2E-2`, nil, &testStruct{-2e-2}},
 		{`floatval = 6.626e-34`, nil, &testStruct{6.626e-34}},
 		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{9224617.445991228313}},
 		{`floatval = 1e1_00`, nil, &testStruct{1e100}},

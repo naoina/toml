@@ -314,12 +314,16 @@ func (p *toml) SetBasicString(buf []rune, begin, end int) {
 	p.s = p.unquote(string(buf[begin:end]))
 }
 
-func (p *toml) SetMultilineString() {
+func (p *toml) SetMultilineBasicString() {
 	p.s = p.unquote(`"` + escapeReplacer.Replace(strings.TrimLeft(p.s, "\r\n")) + `"`)
 }
 
 func (p *toml) AddMultilineBasicBody(buf []rune, begin, end int) {
 	p.s += string(buf[begin:end])
+}
+
+func (p *toml) AddMultilineBasicQuote() {
+	p.s += "\\\""
 }
 
 func (p *toml) SetLiteralString(buf []rune, begin, end int) {

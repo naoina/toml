@@ -41,6 +41,9 @@ val <- (
   / inlineTable
 )
 
+# -------------------------------------------------------------------------
+# -- Tables
+
 table <- stdTable / arrayTable
 
 stdTable <- '[' ws <tableKey> ws ']' { p.SetTable(p.buffer, begin, end) }
@@ -63,12 +66,17 @@ tableKeySep <- ws '.' ws
 
 inlineTableValSep <- ws ',' ws
 
-integer <- [\-+]? int
-int <- [1-9] (digit / '_' digit)+ / digit
+# -------------------------------------------------------------------------
+# -- Escape Sequences
 
-float <- integer (frac exp? / frac? exp)
-frac <- '.' digit (digit / '_' digit)*
-exp <- [eE] [\-+]? digit (digit / '_' digit)*
+escaped <- escape ([btnfr"/\\] / 'u' hexQuad / 'U' hexQuad hexQuad)
+escape <- '\\'
+
+hexDigit <- [0-9A-Fa-f]
+hexQuad <- hexDigit hexDigit hexDigit hexDigit
+
+# -------------------------------------------------------------------------
+# -- Strings
 
 string <- (
     mlLiteralString
@@ -80,16 +88,15 @@ string <- (
 basicString <- <'"' basicChar* '"'> { p.SetBasicString(p.buffer, begin, end) }
 
 basicChar <- basicUnescaped / escaped
-escaped <- escape ([btnfr"/\\] / 'u' hexQuad / 'U' hexQuad hexQuad)
 
+# This is basically the full printable range, excluding " and \
 basicUnescaped <- [ -!#-\[\]-\0x10FFFF]
 
-escape <- '\\'
-
-mlBasicString <- '"""' mlBasicBody '"""' { p.SetMultilineString() }
+mlBasicString <- '"""' mlBasicBody '"""' { p.SetMultilineBasicString() }
 
 mlBasicBody <- (
-    <basicChar / newline> { p.AddMultilineBasicBody(p.buffer, begin, end) }
+    !'"""' '"' { p.AddMultilineBasicQuote() }
+  / <basicChar / newline> { p.AddMultilineBasicBody(p.buffer, begin, end) }
   / escape newline wsnl
 )*
 
@@ -103,10 +110,13 @@ mlLiteralBody <- (!"'''" (mlLiteralChar / newline))*
 
 mlLiteralChar <- [\t -\0x10FFFF]
 
-hexdigit <- [0-9A-Fa-f]
-hexQuad <- hexdigit hexdigit hexdigit hexdigit
+# -------------------------------------------------------------------------
+# -- Bool
 
 boolean <- 'true' / 'false'
+
+# -------------------------------------------------------------------------
+# -- Datetime
 
 dateFullYear <- digitQuad
 dateMonth <- digitDual
@@ -122,9 +132,22 @@ fullDate <- dateFullYear '-' dateMonth '-' dateMDay
 fullTime <- partialTime timeOffset?
 datetime <- (fullDate ('T' fullTime)?) / partialTime
 
+# -------------------------------------------------------------------------
+# -- Numbers
+
+integer <- [\-+]? int
+int <- [1-9] (digit / '_' digit)+ / digit
+
+float <- integer (frac exp? / frac? exp)
+frac <- '.' digit (digit / '_' digit)*
+exp <- [eE] [\-+]? digit (digit / '_' digit)*
+
 digit <- [0-9]
 digitDual <- digit digit
 digitQuad <- digitDual digitDual
+
+# -------------------------------------------------------------------------
+# -- Array
 
 array <- (
     '[' { p.StartArray() }
