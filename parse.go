@@ -125,10 +125,15 @@ func (p *tomlParser) SetTime(begin, end int) {
 }
 
 func (p *tomlParser) SetFloat(begin, end int) {
+	v := underscoreReplacer.Replace(string(p.buffer[begin:end]))
+	// Make value compatible with strconv.ParseFloat.
+	if v == "+nan" || v == "-nan" {
+		v = "nan"
+	}
 	p.val = &ast.Float{
 		Position: ast.Position{Begin: begin, End: end},
 		Data:     p.buffer[begin:end],
-		Value:    underscoreReplacer.Replace(string(p.buffer[begin:end])),
+		Value:    v,
 	}
 }
 

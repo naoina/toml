@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"path/filepath"
 	"reflect"
@@ -487,6 +488,9 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		Floatval float64
 	}
 	testUnmarshal(t, []testcase{
+		{`floatval = inf`, nil, &testStruct{math.Inf(1)}},
+		{`floatval = +inf`, nil, &testStruct{math.Inf(1)}},
+		{`floatval = -inf`, nil, &testStruct{math.Inf(-1)}},
 		{`floatval = 0.0`, nil, &testStruct{0.0}},
 		{`floatval = +0.0`, nil, &testStruct{0.0}},
 		{`floatval = -0.0`, nil, &testStruct{-0.0}},
@@ -526,6 +530,21 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = 0o71.0`, lineError(1, errParse), &testStruct{}},
 		{`floatval = 0b01.0`, lineError(1, errParse), &testStruct{}},
 	})
+}
+
+func TestUnmarshal_FloatNaN(t *testing.T) {
+	tests := []string{"nan", "+nan", "-nan"}
+	for _, input := range tests {
+		var dec struct {
+			Floatval float64
+		}
+		if err := Unmarshal([]byte(`floatval = `+input), &dec); err != nil {
+			t.Fatalf("input %q: unexpected error %q", input, err)
+		}
+		if !math.IsNaN(dec.Floatval) {
+			t.Fatalf("unmarshal result for %q is not NaN: %v", input, dec.Floatval)
+		}
+	}
 }
 
 func TestUnmarshal_WithBoolean(t *testing.T) {

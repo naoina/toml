@@ -88,7 +88,8 @@ octalDigit <- [0-7]
 binaryInt <- '0b' binaryDigit (binaryDigit / '_' octalDigit)*
 binaryDigit <- [01]
 
-float <- [+\-]? decimalInt (floatFrac floatExp? / floatFrac? floatExp)
+float <- [+\-]? ('nan' / 'inf' / floatDigits)
+floatDigits <- decimalInt (floatFrac floatExp? / floatFrac? floatExp)
 floatFrac <- '.' decimalDigit (decimalDigit / '_' decimalDigit)*
 floatExp <- [eE] [\-+]? decimalDigit (decimalDigit / '_' decimalDigit)*
 
