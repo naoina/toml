@@ -180,15 +180,20 @@ type TableType uint8
 const (
 	TableTypeNormal TableType = iota
 	TableTypeArray
+	TableTypeInline
 )
 
 var tableTypes = [...]string{
 	"normal",
 	"array",
+	"inline",
 }
 
 func (t TableType) String() string {
-	return tableTypes[t]
+	if t > 0 && int(t) < len(tableTypes) {
+		return tableTypes[t]
+	}
+	return "unknown type"
 }
 
 type Table struct {

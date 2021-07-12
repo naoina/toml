@@ -131,6 +131,49 @@ var marshalTests = []struct {
 		}{[][]int{{1, 2}, {3, 4}}},
 		expect: []byte("ints_of_ints = [[1, 2], [3, 4]]\n"),
 	},
+	// heterogenous slices:
+	{
+		v: struct {
+			I []interface{}
+		}{[]interface{}{
+			[]int{1, 2}, float64(2), int32(-5), "yo", true,
+		}},
+		expect: []byte("i = [[1, 2], 2e+00, -5, \"yo\", true]\n"),
+	},
+	{
+		v: struct {
+			MI []interface{}
+		}{[]interface{}{
+			map[string]int{"a": 1, "b": 2},
+			"multi",
+		}},
+		expect: []byte("m_i = [{a = 1, b = 2}, \"multi\"]\n"),
+	},
+	{
+		v: struct {
+			MI []interface{}
+		}{[]interface{}{
+			"multi",
+			map[string]int{"a": 1, "b": 2},
+		}},
+		expect: []byte("m_i = [\"multi\", {a = 1, b = 2}]\n"),
+	},
+	{
+		v: struct {
+			MI []interface{}
+		}{[]interface{}{
+			"multimulti",
+			map[string]interface{}{
+				"b": 1,
+				"m": map[string]interface{}{
+					"x": 2,
+					"y": []int{3, 4},
+				},
+			},
+		}},
+		expect: []byte("m_i = [\"multimulti\", {b = 1, m = {x = 2, y = [3, 4]}}]\n"),
+	},
+
 	// pointer:
 	{
 		v:      struct{ Named *Name }{&Name{First: "name"}},
