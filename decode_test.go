@@ -525,6 +525,10 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		// invalid _
 		{`floatval = _1e1_00`, lineError(1, errParse), &testStruct{}},
 		{`floatval = 1e1_00_`, lineError(1, errParse), &testStruct{}},
+		// invalid encodings from spec
+		{`floatval = .7`, lineError(1, errParse), &testStruct{}},
+		{`floatval = 7.`, lineError(1, errParse), &testStruct{}},
+		{`floatval = 3.e+20`, lineError(1, errParse), &testStruct{}},
 		// non-decimal base unsupported
 		{`floatval = 0xff.0`, lineError(1, errParse), &testStruct{}},
 		{`floatval = 0o71.0`, lineError(1, errParse), &testStruct{}},
