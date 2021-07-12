@@ -18,6 +18,17 @@ import (
 
 var errParse = errors.New("invalid TOML syntax")
 
+var (
+	underscoreReplacer = strings.NewReplacer("_", "")
+	escapeReplacer     = strings.NewReplacer(
+		"\b", "\\n",
+		"\f", "\\f",
+		"\n", "\\n",
+		"\r", "\\r",
+		"\t", "\\t",
+	)
+)
+
 // Parse returns an AST representation of TOML.
 // The toplevel is represented by a table.
 func Parse(data []byte) (*ast.Table, error) {

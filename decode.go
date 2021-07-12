@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/naoina/toml/ast"
@@ -18,19 +17,6 @@ import (
 
 const (
 	tableSeparator = '.'
-)
-
-var (
-	escapeReplacer = strings.NewReplacer(
-		"\b", "\\n",
-		"\f", "\\f",
-		"\n", "\\n",
-		"\r", "\\r",
-		"\t", "\\t",
-	)
-	underscoreReplacer = strings.NewReplacer(
-		"_", "",
-	)
 )
 
 var timeType = reflect.TypeOf(time.Time{})
