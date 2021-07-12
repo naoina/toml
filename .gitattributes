@@ -1,0 +1,2 @@
+/testdata/unmarshal-errline-lf.toml eol=lf
+/testdata/unmarshal-errline-crlf.toml eol=crlf
