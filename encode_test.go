@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -53,6 +54,27 @@ var marshalTests = []struct {
 	{
 		v:      struct{ Age int }{7},
 		expect: []byte("age = 7\n"),
+	},
+	// floats:
+	{
+		v:      struct{ F float64 }{32},
+		expect: []byte("f = 3.2e+01\n"), // TODO: this is kind of ugly
+	},
+	{
+		v:      struct{ F float64 }{-33000000.456789},
+		expect: []byte("f = -3.3000000456789e+07\n"),
+	},
+	{
+		v:      struct{ F float64 }{math.NaN()},
+		expect: []byte("f = nan\n"),
+	},
+	{
+		v:      struct{ F float64 }{math.Inf(1)},
+		expect: []byte("f = inf\n"),
+	},
+	{
+		v:      struct{ F float64 }{math.Inf(-1)},
+		expect: []byte("f = -inf\n"),
 	},
 	// multiple fields:
 	{

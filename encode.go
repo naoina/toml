@@ -5,6 +5,7 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -247,7 +248,7 @@ func (b *tableBuf) value(cfg *Config, rv reflect.Value, name string) (bool, erro
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		b.body = strconv.AppendUint(b.body, rv.Uint(), 10)
 	case reflect.Float32, reflect.Float64:
-		b.body = strconv.AppendFloat(b.body, rv.Float(), 'e', -1, 64)
+		b.body = appendFloat(b.body, rv.Float())
 	case reflect.Bool:
 		b.body = strconv.AppendBool(b.body, rv.Bool())
 	case reflect.String:
@@ -388,6 +389,19 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.IsNil()
 	}
 	return false
+}
+
+func appendFloat(out []byte, v float64) []byte {
+	if math.IsNaN(v) {
+		return append(out, "nan"...)
+	}
+	if math.IsInf(v, -1) {
+		return append(out, "-inf"...)
+	}
+	if math.IsInf(v, 1) {
+		return append(out, "inf"...)
+	}
+	return strconv.AppendFloat(out, v, 'e', -1, 64)
 }
 
 func quoteName(s string) string {
