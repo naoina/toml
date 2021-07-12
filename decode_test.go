@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -406,6 +407,35 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = 1_000`, nil, &testStruct{1000}},
 		{`intval = 5_349_221`, nil, &testStruct{5349221}},
 		{`intval = 1_2_3_4_5`, nil, &testStruct{12345}},
+		// hex
+		{`intval = 0x0`, nil, &testStruct{0}},
+		{`intval = -0x0`, nil, &testStruct{0}},
+		{`intval = 0x010203`, nil, &testStruct{0x010203}},
+		{`intval = -0x010203`, nil, &testStruct{-0x010203}},
+		// octal
+		{`intval = 0o0`, nil, &testStruct{0}},
+		{`intval = -0o0`, nil, &testStruct{0}},
+		{`intval = 0o76543210`, nil, &testStruct{0o76543210}},
+		{`intval = -0o76543210`, nil, &testStruct{-0o76543210}},
+		// binary
+		{`intval = 0b0`, nil, &testStruct{0}},
+		{`intval = 0b1`, nil, &testStruct{1}},
+		{`intval = 0b01100110`, nil, &testStruct{102}},
+		{`intval = 0b011_00110`, nil, &testStruct{102}},
+		{`intval = -0b011_00110`, nil, &testStruct{-102}},
+		// invalid _
+		{`intval = _1_000`, lineError(1, errParse), &testStruct{}},
+		{`intval = 1_000_`, lineError(1, errParse), &testStruct{}},
+		{`intval = 0x_01`, lineError(1, errParse), &testStruct{}},
+		{`intval = 0x01_`, lineError(1, errParse), &testStruct{}},
+		{`intval = 0o_01`, lineError(1, errParse), &testStruct{}},
+		{`intval = 0o01_`, lineError(1, errParse), &testStruct{}},
+		{`intval = 0b_01`, lineError(1, errParse), &testStruct{}},
+		{`intval = 0b01_`, lineError(1, errParse), &testStruct{}},
+		// plus sign unsupported for non-decimal ints
+		{`intval = +0x01`, lineError(1, errParse), &testStruct{}},
+		{`intval = +0o01`, lineError(1, errParse), &testStruct{}},
+		{`intval = +0b01`, lineError(1, errParse), &testStruct{}},
 		// overflow
 		{
 			data:   `intval = 9223372036854775808`,
@@ -422,9 +452,33 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 			err:    lineErrorField(1, "toml.testStruct.Intval", &overflowError{reflect.Int64, "-9223372036854775809"}),
 			expect: &testStruct{},
 		},
-		// invalid _
-		{`intval = _1_000`, lineError(1, errParse), &testStruct{}},
-		{`intval = 1_000_`, lineError(1, errParse), &testStruct{}},
+	})
+}
+
+func TestUnmarshal_WithUint(t *testing.T) {
+	type testStruct struct {
+		U64 uint64
+		U32 uint32
+		U16 uint16
+		U8  uint8
+	}
+	testUnmarshal(t, []testcase{
+		{`u64 = 12`, nil, &testStruct{U64: 12}},
+		{`u32 = 12`, nil, &testStruct{U32: 12}},
+		{`u16 = 12`, nil, &testStruct{U16: 12}},
+		{`u8 = 12`, nil, &testStruct{U8: 12}},
+		// error when negative
+		{
+			data:   `u64 = -12`,
+			err:    lineErrorField(1, "toml.testStruct.U64", &unmarshalTypeError{"integer < 0", "", reflect.TypeOf(uint64(0))}),
+			expect: &testStruct{},
+		},
+		// overflow
+		{
+			data:   `u8 = 256`,
+			err:    lineErrorField(1, "toml.testStruct.U8", &overflowError{reflect.Uint8, "256"}),
+			expect: &testStruct{},
+		},
 	})
 }
 
@@ -464,8 +518,13 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = 9_224_617.445_991_228_313`, nil, &testStruct{9224617.445991228313}},
 		{`floatval = 1e1_00`, nil, &testStruct{1e100}},
 		{`floatval = 1e02`, nil, &testStruct{1e2}},
+		// invalid _
 		{`floatval = _1e1_00`, lineError(1, errParse), &testStruct{}},
 		{`floatval = 1e1_00_`, lineError(1, errParse), &testStruct{}},
+		// non-decimal base unsupported
+		{`floatval = 0xff.0`, lineError(1, errParse), &testStruct{}},
+		{`floatval = 0o71.0`, lineError(1, errParse), &testStruct{}},
+		{`floatval = 0b01.0`, lineError(1, errParse), &testStruct{}},
 	})
 }
 
@@ -1051,6 +1110,7 @@ func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
 		Int        testTextUnmarshaler
 		Float      testTextUnmarshaler
 		Arraytable []testStruct
+		BigInt     *big.Int
 	}
 
 	tests := []testcase{
@@ -1067,6 +1127,23 @@ func TestUnmarshal_WithTextUnmarshaler(t *testing.T) {
 			data:   `str = "error"`,
 			expect: &testStruct{Str: "Unmarshaled: error"},
 			err:    lineErrorField(1, "toml.testStruct.Str", errTextUnmarshaler),
+		},
+		// big.Int tests
+		{
+			data:   `BigInt = 20`,
+			expect: &testStruct{BigInt: big.NewInt(20)},
+		},
+		{
+			data:   `BigInt = -20`,
+			expect: &testStruct{BigInt: big.NewInt(-20)},
+		},
+		{
+			data:   `BigInt = 0xFFFFFFFFFFFF`,
+			expect: &testStruct{BigInt: big.NewInt(0xFFFFFFFFFFFF)},
+		},
+		{
+			data:   `BigInt = 0xFF_FF_FF_FF_FF_FF`,
+			expect: &testStruct{BigInt: big.NewInt(0xFFFFFFFFFFFF)},
 		},
 	}
 	testUnmarshal(t, tests)

@@ -31,8 +31,8 @@ quotedKey <- < '"' basicChar* '"' > { p.SetKey(p.buffer, begin, end) }
 
 val <- (
     <datetime>    { p.SetTime(begin, end) }
-  / <float>       { p.SetFloat64(begin, end) }
-  / <integer>     { p.SetInt64(begin, end) }
+  / <float>       { p.SetFloat(begin, end) }
+  / <integer>     { p.SetInteger(begin, end) }
   / <string>      { p.SetString(begin, end) }
   / <boolean>     { p.SetBool(begin, end) }
   / <array>       { p.SetArray(begin, end) }
@@ -65,12 +65,39 @@ tableKeySep <- ws '.' ws
 inlineTableValSep <- ws ',' ws
 
 # -------------------------------------------------------------------------
+# -- Booleans
+
+boolean <- 'true' / 'false'
+
+# -------------------------------------------------------------------------
+# -- Numbers
+
+integer <- ('+' decimalInt) / ('-' anyInt) / anyInt
+
+anyInt <- hexInt / octalInt / binaryInt / decimalInt
+
+decimalInt <- [1-9] (decimalDigit / '_' decimalDigit)+ / decimalDigit
+decimalDigit <- [0-9]
+
+hexInt <- '0x' hexDigit (hexDigit / '_' hexDigit)*
+hexDigit <- [0-9A-Fa-f]
+
+octalInt <- '0o' octalDigit (octalDigit / '_' octalDigit)*
+octalDigit <- [0-7]
+
+binaryInt <- '0b' binaryDigit (binaryDigit / '_' octalDigit)*
+binaryDigit <- [01]
+
+float <- [+\-]? decimalInt (floatFrac floatExp? / floatFrac? floatExp)
+floatFrac <- '.' decimalDigit (decimalDigit / '_' decimalDigit)*
+floatExp <- [eE] [\-+]? decimalDigit (decimalDigit / '_' decimalDigit)*
+
+# -------------------------------------------------------------------------
 # -- Escape Sequences
 
 escaped <- escape ([btnfr"/\\] / 'u' hexQuad / 'U' hexQuad hexQuad)
 escape <- '\\'
 
-hexDigit <- [0-9A-Fa-f]
 hexQuad <- hexDigit hexDigit hexDigit hexDigit
 
 # -------------------------------------------------------------------------
@@ -109,12 +136,7 @@ mlLiteralBody <- (!"'''" (mlLiteralChar / newline))*
 mlLiteralChar <- [\t -\0x10FFFF]
 
 # -------------------------------------------------------------------------
-# -- Bool
-
-boolean <- 'true' / 'false'
-
-# -------------------------------------------------------------------------
-# -- Datetime
+# -- Datetimes
 
 dateFullYear <- digitQuad
 dateMonth <- digitDual
@@ -122,7 +144,7 @@ dateMDay <- digitDual
 timeHour <- digitDual
 timeMinute <- digitDual
 timeSecond <- digitDual
-timeSecfrac <- '.' digit+
+timeSecfrac <- '.' decimalDigit+
 timeNumoffset <- [\-+] timeHour ':' timeMinute
 timeOffset <- 'Z' / timeNumoffset
 partialTime <- timeHour ':' timeMinute ':' timeSecond timeSecfrac?
@@ -130,22 +152,11 @@ fullDate <- dateFullYear '-' dateMonth '-' dateMDay
 fullTime <- partialTime timeOffset?
 datetime <- (fullDate ([T ] fullTime)?) / partialTime
 
-# -------------------------------------------------------------------------
-# -- Numbers
-
-integer <- [\-+]? int
-int <- [1-9] (digit / '_' digit)+ / digit
-
-float <- integer (frac exp? / frac? exp)
-frac <- '.' digit (digit / '_' digit)*
-exp <- [eE] [\-+]? digit (digit / '_' digit)*
-
-digit <- [0-9]
-digitDual <- digit digit
+digitDual <- decimalDigit decimalDigit
 digitQuad <- digitDual digitDual
 
 # -------------------------------------------------------------------------
-# -- Array
+# -- Arrays
 
 array <- (
     '[' { p.StartArray() }

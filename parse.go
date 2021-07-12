@@ -124,7 +124,7 @@ func (p *tomlParser) SetTime(begin, end int) {
 	}
 }
 
-func (p *tomlParser) SetFloat64(begin, end int) {
+func (p *tomlParser) SetFloat(begin, end int) {
 	p.val = &ast.Float{
 		Position: ast.Position{Begin: begin, End: end},
 		Data:     p.buffer[begin:end],
@@ -132,7 +132,7 @@ func (p *tomlParser) SetFloat64(begin, end int) {
 	}
 }
 
-func (p *tomlParser) SetInt64(begin, end int) {
+func (p *tomlParser) SetInteger(begin, end int) {
 	p.val = &ast.Integer{
 		Position: ast.Position{Begin: begin, End: end},
 		Data:     p.buffer[begin:end],

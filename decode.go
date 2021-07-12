@@ -350,6 +350,10 @@ func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
 		return &unmarshalTypeError{"array", "", lhs.Type()}, true
 	case *ast.String:
 		data = val.Value
+	case *ast.Integer:
+		data = val.Value
+	case *ast.Float:
+		data = val.Value
 	default:
 		data = val.Source()
 	}
@@ -360,19 +364,22 @@ func setInt(fv reflect.Value, v *ast.Integer) error {
 	k := fv.Kind()
 	switch {
 	case k >= reflect.Int && k <= reflect.Int64:
-		i, err := strconv.ParseInt(v.Value, 10, int(fv.Type().Size()*8))
+		i, err := strconv.ParseInt(v.Value, 0, int(fv.Type().Size()*8))
 		if err != nil {
 			return convertNumError(fv.Kind(), err)
 		}
 		fv.SetInt(i)
 	case k >= reflect.Uint && k <= reflect.Uintptr:
-		i, err := strconv.ParseUint(v.Value, 10, int(fv.Type().Size()*8))
+		if v.Sign() < 0 {
+			return &unmarshalTypeError{"integer < 0", "", fv.Type()}
+		}
+		i, err := strconv.ParseUint(v.Value, 0, int(fv.Type().Size()*8))
 		if err != nil {
 			return convertNumError(fv.Kind(), err)
 		}
 		fv.SetUint(i)
 	case isEface(fv):
-		i, err := strconv.ParseInt(v.Value, 10, 64)
+		i, err := strconv.ParseInt(v.Value, 0, 64)
 		if err != nil {
 			return convertNumError(reflect.Int64, err)
 		}

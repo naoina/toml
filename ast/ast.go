@@ -54,7 +54,20 @@ func (i *Integer) Source() string {
 }
 
 func (i *Integer) Int() (int64, error) {
-	return strconv.ParseInt(i.Value, 10, 64)
+	return strconv.ParseInt(i.Value, 0, 64)
+}
+
+// Sign returns -1 when the integer is negative, +1 when it is
+// explicitly positive, and 0 otherwise.
+func (i *Integer) Sign() int {
+	if len(i.Value) > 0 {
+		if i.Value[0] == '-' {
+			return -1
+		} else if i.Value[0] == '+' {
+			return 1
+		}
+	}
+	return 0
 }
 
 type Float struct {
