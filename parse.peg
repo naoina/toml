@@ -4,7 +4,7 @@ type tomlParser Peg {
     toml
 }
 
-TOML <- Expression (newline Expression)* newline? !. { _ = buffer }
+TOML <- Expression (newline Expression)* newline* !. { _ = buffer }
 
 Expression <- (
     <ws table ws comment? (wsnl keyval ws comment?)*> { p.SetTableString(begin, end) }
@@ -13,13 +13,11 @@ Expression <- (
   / ws
 )
 
-newline <- <[\r\n]+> { p.AddLineCount(end - begin) }
+newline <- ('\r\n' / '\n') { p.Newline() }
 
 ws <- [ \t]*
-wsnl <- (
-    [ \t]
-  / <[\r\n]> { p.AddLineCount(end - begin) }
-)*
+
+wsnl <- ([ \t] / newline)*
 
 comment <- '#' <[\t -\0x10FFFF]*>
 

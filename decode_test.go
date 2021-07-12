@@ -1348,3 +1348,20 @@ func TestUnmarshal_WithInterface(t *testing.T) {
 		{`[[v]]`, lineError(1, &unmarshalTypeError{"array table", "slice", nonemptyIfType}), map[string]nonemptyIf{}},
 	})
 }
+
+// This test checks that error line numbers are correct for both
+// kinds of line-endings.
+func TestUnmarshal_ErrorLine(t *testing.T) {
+	testUnmarshal(t, []testcase{
+		{
+			data:   string(loadTestData("unmarshal-errline-lf.toml")),
+			err:    lineError(5, fmt.Errorf("key `key2' is in conflict with line 3")),
+			expect: map[string]interface{}{},
+		},
+		{
+			data:   string(loadTestData("unmarshal-errline-crlf.toml")),
+			err:    lineError(5, fmt.Errorf("key `key2' is in conflict with line 3")),
+			expect: map[string]interface{}{},
+		},
+	})
+}

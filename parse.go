@@ -277,8 +277,8 @@ func (p *toml) EndInlineTable() {
 	p.skip = true
 }
 
-func (p *toml) AddLineCount(i int) {
-	p.line += i
+func (p *toml) Newline() {
+	p.line++
 }
 
 func (p *toml) SetKey(buf []rune, begin, end int) {
@@ -302,7 +302,7 @@ func (p *toml) AddKeyValue() {
 		case *ast.Table:
 			p.Error(fmt.Errorf("key `%s' is in conflict with table in line %d", p.key, v.Line))
 		case *ast.KeyValue:
-			p.Error(fmt.Errorf("key `%s' is in conflict with line %xd", p.key, v.Line))
+			p.Error(fmt.Errorf("key `%s' is in conflict with line %d", p.key, v.Line))
 		default:
 			p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", p.key, v))
 		}
