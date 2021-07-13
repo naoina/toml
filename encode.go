@@ -384,10 +384,10 @@ func (b *tableBuf) array(cfg *Config, rv reflect.Value, name string) ([]*tableBu
 		}
 		newTables = append(newTables, tables...)
 
-		if anyPlainValue && len(newTables) > 0 {
-			// Turns out this is a heterogenous array, mixing table and non-table values.
-			// If any tables were already created, we need to remove them again and start
-			// over.
+		if len(newTables) > 0 && (anyPlainValue || b.arrayDepth > 1) {
+			// Turns out this is a heterogenous array, mixing table and non-table values,
+			// or a multi-dimensional array containing tables. If any tables were already
+			// created, we need to remove them again and start over.
 			b.children = childrenBeforeArray
 			b.body = b.body[:offsetBeforeArray]
 			err := b.mixedArray(cfg, rv, name)
