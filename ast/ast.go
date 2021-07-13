@@ -190,7 +190,7 @@ var tableTypes = [...]string{
 }
 
 func (t TableType) String() string {
-	if t > 0 && int(t) < len(tableTypes) {
+	if int(t) < len(tableTypes) {
 		return tableTypes[t]
 	}
 	return "unknown type"
