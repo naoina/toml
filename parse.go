@@ -20,6 +20,7 @@ var errParse = errors.New("invalid TOML syntax")
 
 var (
 	underscoreReplacer = strings.NewReplacer("_", "")
+	timeLetterReplacer = strings.NewReplacer("z", "Z", "t", "T")
 	escapeReplacer     = strings.NewReplacer(
 		"\b", "\\n",
 		"\f", "\\f",
@@ -134,16 +135,18 @@ func (p *toml) Newline() {
 // -- Primitive Value Callbacks --
 
 func (p *tomlParser) SetTime(begin, end int) {
+	// Make value compatible with time.Parse.
+	v := timeLetterReplacer.Replace(string(p.buffer[begin:end]))
 	p.val = &ast.Datetime{
 		Position: ast.Position{Begin: begin, End: end},
 		Data:     p.buffer[begin:end],
-		Value:    string(p.buffer[begin:end]),
+		Value:    v,
 	}
 }
 
 func (p *tomlParser) SetFloat(begin, end int) {
-	v := underscoreReplacer.Replace(string(p.buffer[begin:end]))
 	// Make value compatible with strconv.ParseFloat.
+	v := underscoreReplacer.Replace(string(p.buffer[begin:end]))
 	if v == "+nan" || v == "-nan" {
 		v = "nan"
 	}
