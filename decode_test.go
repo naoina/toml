@@ -603,6 +603,7 @@ func TestUnmarshal_WithArray(t *testing.T) {
 	type arrays struct {
 		Ints    []int
 		Strings []string
+		Anys    []interface{}
 	}
 
 	testUnmarshal(t, []testcase{
@@ -659,12 +660,25 @@ func TestUnmarshal_WithArray(t *testing.T) {
 					{int64(5), int64(6)},
 				},
 			}},
+		// heterogenous arrays
 		{
-			data:   `ints = [ 1, 2.0 ] # note: this is NOT ok`,
-			err:    lineErrorField(1, "toml.arrays.Ints", errArrayMultiType),
-			expect: &arrays{},
+			data:   `anys = [1, 2.0]`,
+			expect: &arrays{Anys: []interface{}{int64(1), float64(2.0)}},
 		},
-		// whitespace + comments
+		{
+			data: string(loadTestData("unmarshal-array-multitype.toml")),
+			expect: &arrays{
+				Anys: []interface{}{
+					"Foo Bar <foo@example.com>",
+					map[string]interface{}{
+						"name":  "Baz Qux",
+						"email": "bazqux@example.com",
+						"url":   "https://example.com/bazqux",
+					},
+				},
+			},
+		},
+		// // whitespace + comments
 		{string(loadTestData("unmarshal-array-1.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
 		{string(loadTestData("unmarshal-array-2.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
 		{string(loadTestData("unmarshal-array-3.toml")), nil, &arrays{Ints: []int{1, 2, 3}}},
@@ -1037,7 +1051,7 @@ func TestUnmarshal_WithArrayTable(t *testing.T) {
 		},
 		{
 			data:   string(loadTestData("unmarshal-arraytable-conflict-3.toml")),
-			err:    lineError(8, fmt.Errorf("array table `fruit.variety' is in conflict with table in line 5")),
+			err:    lineError(8, fmt.Errorf("array table `fruit.variety' is in conflict with line 5")),
 			expect: &testStruct{},
 		},
 	})

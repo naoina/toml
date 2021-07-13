@@ -103,16 +103,15 @@ type array struct {
 }
 
 type toml struct {
-	table        *ast.Table
-	line         int
-	currentTable *ast.Table
-	s            string
-	key          string
-	tableKeys    []string
-	val          ast.Value
-	arr          *array
-	stack        []*stack
-	skip         bool
+	table        *ast.Table // the top-level table
+	line         int        // the current line number
+	currentTable *ast.Table // the current table
+	arr          *array     // the current array
+	s            string     // temporary buffer for string values
+	key          string     // the current table key
+	tableKeys    []string   // accumulator for dotted keys
+	val          ast.Value  // last decoded value
+	stack        []*stack   // table stack (for inline tables)
 }
 
 func (p *toml) init(data []rune) {
@@ -126,6 +125,13 @@ func (p *toml) init(data []rune) {
 func (p *toml) Error(err error) {
 	panic(lineError(p.line, err))
 }
+
+// Newline is called whenever the parser moves to a new line.
+func (p *toml) Newline() {
+	p.line++
+}
+
+// -- Primitive Value Callbacks --
 
 func (p *tomlParser) SetTime(begin, end int) {
 	p.val = &ast.Datetime{
@@ -173,7 +179,47 @@ func (p *tomlParser) SetBool(begin, end int) {
 	}
 }
 
-func (p *tomlParser) StartArray() {
+// -- String Callbacks --
+//
+// These run during string parsing and build up the string in p.s.
+
+func (p *toml) SetBasicString(buf []rune, begin, end int) {
+	p.s = p.unquote(string(buf[begin:end]))
+}
+
+func (p *toml) SetMultilineBasicString() {
+	p.s = p.unquote(`"` + escapeReplacer.Replace(strings.TrimLeft(p.s, "\r\n")) + `"`)
+}
+
+func (p *toml) AddMultilineBasicBody(buf []rune, begin, end int) {
+	p.s += string(buf[begin:end])
+}
+
+func (p *toml) AddMultilineBasicQuote() {
+	p.s += "\\\""
+}
+
+func (p *toml) SetLiteralString(buf []rune, begin, end int) {
+	p.s = string(buf[begin:end])
+}
+
+func (p *toml) SetMultilineLiteralString(buf []rune, begin, end int) {
+	p.s = strings.TrimLeft(string(buf[begin:end]), "\r\n")
+}
+
+func (p *toml) unquote(s string) string {
+	s, err := strconv.Unquote(s)
+	if err != nil {
+		p.Error(err)
+	}
+	return s
+}
+
+// -- Array Callbacks --
+//
+// These callbacks maintain the array stack and accumulate elements.
+
+func (p *toml) StartArray() {
 	if p.arr == nil {
 		p.arr = &array{line: p.line, current: &ast.Array{}}
 		return
@@ -182,7 +228,7 @@ func (p *tomlParser) StartArray() {
 	p.arr = p.arr.child
 }
 
-func (p *tomlParser) AddArrayVal() {
+func (p *toml) AddArrayVal() {
 	if p.arr.current == nil {
 		p.arr.current = &ast.Array{}
 	}
@@ -195,6 +241,8 @@ func (p *tomlParser) SetArray(begin, end int) {
 	p.val = p.arr.current
 	p.arr = p.arr.parent
 }
+
+// -- Table Callbacks --
 
 func (p *toml) SetTable(buf []rune, begin, end int) {
 	rawName := string(buf[begin:end])
@@ -240,11 +288,66 @@ func (p *toml) newTable(typ ast.TableType, name string) *ast.Table {
 	}
 }
 
+func (p *toml) lookupTable(t *ast.Table, keys []string) (*ast.Table, error) {
+	for _, s := range keys {
+		val, exists := t.Fields[s]
+		if !exists {
+			tbl := p.newTable(ast.TableTypeNormal, s)
+			t.Fields[s] = tbl
+			t = tbl
+			continue
+		}
+		switch v := val.(type) {
+		case *ast.Table:
+			t = v
+		case []*ast.Table:
+			t = v[len(v)-1]
+		case *ast.KeyValue:
+			return nil, fmt.Errorf("key `%s' is in conflict with line %d", s, v.Line)
+		default:
+			return nil, fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", s, v)
+		}
+	}
+	return t, nil
+}
+
+// SetTableString assigns the source data of a complete table.
 func (p *tomlParser) SetTableString(begin, end int) {
 	p.currentTable.Data = p.buffer[begin:end]
 	p.currentTable.Position.Begin = begin
 	p.currentTable.Position.End = end
 }
+
+func (p *toml) AddTableKey() {
+	p.tableKeys = append(p.tableKeys, p.key)
+}
+
+// SetKey is called after a table key has been parsed.
+func (p *toml) SetKey(buf []rune, begin, end int) {
+	p.key = string(buf[begin:end])
+	if len(p.key) > 0 && p.key[0] == '"' {
+		p.key = p.unquote(p.key)
+	}
+}
+
+// AddKeyValue is called after a complete key/value pair has been parsed.
+func (p *toml) AddKeyValue() {
+	if val, exists := p.currentTable.Fields[p.key]; exists {
+		switch v := val.(type) {
+		case []*ast.Table:
+			p.Error(fmt.Errorf("key `%s' is in conflict with array table in line %d", p.key, v[0].Line))
+		case *ast.Table:
+			p.Error(fmt.Errorf("key `%s' is in conflict with table in line %d", p.key, v.Line))
+		case *ast.KeyValue:
+			p.Error(fmt.Errorf("key `%s' is in conflict with line %d", p.key, v.Line))
+		default:
+			p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", p.key, v))
+		}
+	}
+	p.currentTable.Fields[p.key] = &ast.KeyValue{Key: p.key, Value: p.val, Line: p.line}
+}
+
+// -- Array Table Callbacks --
 
 func (p *toml) SetArrayTable(buf []rune, begin, end int) {
 	rawName := string(buf[begin:end])
@@ -274,109 +377,19 @@ func (p *toml) setArrayTable(parent *ast.Table, name string, names []string) {
 	p.currentTable = tbl
 }
 
+// -- Inline Table Callbacks --
+
 func (p *toml) StartInlineTable() {
-	p.skip = false
+	tbl := p.newTable(ast.TableTypeInline, "")
 	p.stack = append(p.stack, &stack{p.key, p.currentTable})
-	names := []string{p.key}
-	if p.arr == nil {
-		p.setTable(p.currentTable, names[0], names)
-	} else {
-		p.setArrayTable(p.currentTable, names[0], names)
-	}
+	p.currentTable = tbl
 }
 
 func (p *toml) EndInlineTable() {
+	p.val = p.currentTable
+
+	// Restore parent table from stack.
 	st := p.stack[len(p.stack)-1]
 	p.key, p.currentTable = st.key, st.table
-	p.stack[len(p.stack)-1] = nil
 	p.stack = p.stack[:len(p.stack)-1]
-	p.skip = true
-}
-
-func (p *toml) Newline() {
-	p.line++
-}
-
-func (p *toml) SetKey(buf []rune, begin, end int) {
-	p.key = string(buf[begin:end])
-	if len(p.key) > 0 && p.key[0] == '"' {
-		p.key = p.unquote(p.key)
-	}
-}
-
-func (p *toml) AddTableKey() {
-	p.tableKeys = append(p.tableKeys, p.key)
-}
-
-func (p *toml) AddKeyValue() {
-	if p.skip {
-		p.skip = false
-		return
-	}
-	if val, exists := p.currentTable.Fields[p.key]; exists {
-		switch v := val.(type) {
-		case *ast.Table:
-			p.Error(fmt.Errorf("key `%s' is in conflict with table in line %d", p.key, v.Line))
-		case *ast.KeyValue:
-			p.Error(fmt.Errorf("key `%s' is in conflict with line %d", p.key, v.Line))
-		default:
-			p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", p.key, v))
-		}
-	}
-	p.currentTable.Fields[p.key] = &ast.KeyValue{Key: p.key, Value: p.val, Line: p.line}
-}
-
-func (p *toml) SetBasicString(buf []rune, begin, end int) {
-	p.s = p.unquote(string(buf[begin:end]))
-}
-
-func (p *toml) SetMultilineBasicString() {
-	p.s = p.unquote(`"` + escapeReplacer.Replace(strings.TrimLeft(p.s, "\r\n")) + `"`)
-}
-
-func (p *toml) AddMultilineBasicBody(buf []rune, begin, end int) {
-	p.s += string(buf[begin:end])
-}
-
-func (p *toml) AddMultilineBasicQuote() {
-	p.s += "\\\""
-}
-
-func (p *toml) SetLiteralString(buf []rune, begin, end int) {
-	p.s = string(buf[begin:end])
-}
-
-func (p *toml) SetMultilineLiteralString(buf []rune, begin, end int) {
-	p.s = strings.TrimLeft(string(buf[begin:end]), "\r\n")
-}
-
-func (p *toml) unquote(s string) string {
-	s, err := strconv.Unquote(s)
-	if err != nil {
-		p.Error(err)
-	}
-	return s
-}
-
-func (p *toml) lookupTable(t *ast.Table, keys []string) (*ast.Table, error) {
-	for _, s := range keys {
-		val, exists := t.Fields[s]
-		if !exists {
-			tbl := p.newTable(ast.TableTypeNormal, s)
-			t.Fields[s] = tbl
-			t = tbl
-			continue
-		}
-		switch v := val.(type) {
-		case *ast.Table:
-			t = v
-		case []*ast.Table:
-			t = v[len(v)-1]
-		case *ast.KeyValue:
-			return nil, fmt.Errorf("key `%s' is in conflict with line %d", s, v.Line)
-		default:
-			return nil, fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", s, v)
-		}
-	}
-	return t, nil
 }

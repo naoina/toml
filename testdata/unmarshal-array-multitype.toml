@@ -1,0 +1,6 @@
+# unmarshal-array-multitype.toml
+
+anys = [
+  "Foo Bar <foo@example.com>",
+  { name = "Baz Qux", email = "bazqux@example.com", url = "https://example.com/bazqux" }
+]

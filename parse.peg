@@ -21,14 +21,6 @@ wsnl <- ([ \t] / newline)*
 
 comment <- '#' <[\t -\0x10FFFF]*>
 
-keyval <- key ws '=' ws val { p.AddKeyValue() }
-
-key <- bareKey / quotedKey
-
-bareKey <- <[0-9A-Za-z\-_]+> { p.SetKey(p.buffer, begin, end) }
-
-quotedKey <- < '"' basicChar* '"' > { p.SetKey(p.buffer, begin, end) }
-
 val <- (
     <datetime>    { p.SetTime(begin, end) }
   / <float>       { p.SetFloat(begin, end) }
@@ -55,6 +47,14 @@ inlineTable <- (
 )
 
 inlineTableKeyValues <- (keyval inlineTableValSep?)*
+
+keyval <- key ws '=' ws val { p.AddKeyValue() }
+
+key <- bareKey / quotedKey
+
+bareKey <- <[0-9A-Za-z\-_]+> { p.SetKey(p.buffer, begin, end) }
+
+quotedKey <- < '"' basicChar* '"' > { p.SetKey(p.buffer, begin, end) }
 
 tableKey <- tableKeyComp (tableKeySep tableKeyComp)*
 

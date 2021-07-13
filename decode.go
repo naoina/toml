@@ -193,6 +193,8 @@ func fieldLineNumber(fieldAst interface{}) int {
 	}
 }
 
+// unmarshalField is called for struct fields and map entries.
+// rv is the value that should be set.
 func unmarshalField(cfg *Config, rv reflect.Value, fieldAst interface{}) error {
 	switch av := fieldAst.(type) {
 	case *ast.KeyValue:
@@ -274,6 +276,8 @@ func setValue(cfg *Config, lhs reflect.Value, val ast.Value) error {
 		return setDatetime(lhs, v)
 	case *ast.Array:
 		return setArray(cfg, lhs, v)
+	case *ast.Table:
+		return unmarshalTable(cfg, lhs, v, false)
 	default:
 		panic(fmt.Sprintf("BUG: unhandled node type %T", v))
 	}
@@ -449,13 +453,9 @@ func setArray(cfg *Config, rv reflect.Value, v *ast.Array) error {
 		return nil
 	}
 
-	tomltyp := reflect.TypeOf(v.Value[0])
 	slice := reflect.MakeSlice(slicetyp, len(v.Value), len(v.Value))
 	typ := slicetyp.Elem()
 	for i, vv := range v.Value {
-		if i > 0 && tomltyp != reflect.TypeOf(vv) {
-			return errArrayMultiType
-		}
 		tmp := reflect.New(typ).Elem()
 		if err := setValue(cfg, tmp, vv); err != nil {
 			return err
