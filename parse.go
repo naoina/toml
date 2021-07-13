@@ -98,7 +98,7 @@ type tabStackElem struct {
 type array struct {
 	parent *array
 	child  *array
-	a      *ast.Array
+	a      ast.Array
 	line   int
 }
 
@@ -181,7 +181,7 @@ func (p *tomlParser) SetBool(begin, end int) {
 
 // -- String Callbacks --
 //
-// These run during string parsing and build up the string in p.s.
+// These run during string parsing and build up the string in p.stringBuf.
 
 func (p *toml) SetBasicString(buf []rune, begin, end int) {
 	p.stringBuf = p.unquote(string(buf[begin:end]))
@@ -221,24 +221,21 @@ func (p *toml) unquote(s string) string {
 
 func (p *toml) StartArray() {
 	if p.curArray == nil {
-		p.curArray = &array{line: p.line, a: &ast.Array{}}
+		p.curArray = &array{line: p.line}
 		return
 	}
-	p.curArray.child = &array{parent: p.curArray, line: p.line, a: &ast.Array{}}
+	p.curArray.child = &array{parent: p.curArray, line: p.line}
 	p.curArray = p.curArray.child
 }
 
 func (p *toml) AddArrayVal() {
-	if p.curArray.a == nil {
-		p.curArray.a = &ast.Array{}
-	}
 	p.curArray.a.Value = append(p.curArray.a.Value, p.val)
 }
 
 func (p *tomlParser) SetArray(begin, end int) {
 	p.curArray.a.Position = ast.Position{Begin: begin, End: end}
 	p.curArray.a.Data = p.buffer[begin:end]
-	p.val = p.curArray.a
+	p.val = &p.curArray.a
 	p.curArray = p.curArray.parent
 }
 
