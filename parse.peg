@@ -19,7 +19,7 @@ ws <- [ \t]*
 
 wsnl <- ([ \t] / newline)*
 
-comment <- '#' <[\t -\0x10FFFF]*>
+comment <- '#' [\t -\0x10FFFF]*
 
 val <- (
     <datetime>    { p.SetTime(begin, end) }
@@ -164,15 +164,17 @@ array <- (
 )
 
 arrayValues <- (
+    (wsnl comment)* wsnl
     val { p.AddArrayVal() }
     (
-        wsnl comment?
-        wsnl arraySep
-        wsnl comment?
-        wsnl val { p.AddArrayVal() }
+        (wsnl comment)* wsnl
+        arraySep
+        (wsnl comment)* wsnl
+        val { p.AddArrayVal() }
     )*
+    (wsnl comment)*
     wsnl arraySep?
-    wsnl comment?
+    (wsnl comment)*
 )
 
 arraySep <- ','
