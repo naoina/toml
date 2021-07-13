@@ -72,9 +72,7 @@ boolean <- 'true' / 'false'
 # -------------------------------------------------------------------------
 # -- Numbers
 
-integer <- ('+' decimalInt) / ('-' anyInt) / anyInt
-
-anyInt <- hexInt / octalInt / binaryInt / decimalInt
+integer <- hexInt / octalInt / binaryInt / decimalInt / ([+\-] decimalInt)
 
 decimalInt <- [1-9] (decimalDigit / '_' decimalDigit)+ / decimalDigit
 decimalDigit <- [0-9]

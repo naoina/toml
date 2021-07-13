@@ -417,20 +417,15 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = 1_2_3_4_5`, nil, &testStruct{12345}},
 		// hex
 		{`intval = 0x0`, nil, &testStruct{0}},
-		{`intval = -0x0`, nil, &testStruct{0}},
 		{`intval = 0x010203`, nil, &testStruct{0x010203}},
-		{`intval = -0x010203`, nil, &testStruct{-0x010203}},
 		// octal
 		{`intval = 0o0`, nil, &testStruct{0}},
-		{`intval = -0o0`, nil, &testStruct{0}},
 		{`intval = 0o76543210`, nil, &testStruct{0o76543210}},
-		{`intval = -0o76543210`, nil, &testStruct{-0o76543210}},
 		// binary
 		{`intval = 0b0`, nil, &testStruct{0}},
 		{`intval = 0b1`, nil, &testStruct{1}},
 		{`intval = 0b01100110`, nil, &testStruct{102}},
 		{`intval = 0b011_00110`, nil, &testStruct{102}},
-		{`intval = -0b011_00110`, nil, &testStruct{-102}},
 		// invalid _
 		{`intval = _1_000`, lineError(1, errParse), &testStruct{}},
 		{`intval = 1_000_`, lineError(1, errParse), &testStruct{}},
@@ -440,10 +435,13 @@ func TestUnmarshal_WithInteger(t *testing.T) {
 		{`intval = 0o01_`, lineError(1, errParse), &testStruct{}},
 		{`intval = 0b_01`, lineError(1, errParse), &testStruct{}},
 		{`intval = 0b01_`, lineError(1, errParse), &testStruct{}},
-		// plus sign unsupported for non-decimal ints
+		// sign unsupported for non-decimal ints
 		{`intval = +0x01`, lineError(1, errParse), &testStruct{}},
 		{`intval = +0o01`, lineError(1, errParse), &testStruct{}},
 		{`intval = +0b01`, lineError(1, errParse), &testStruct{}},
+		{`intval = -0x01`, lineError(1, errParse), &testStruct{}},
+		{`intval = -0o0`, lineError(1, errParse), &testStruct{}},
+		{`intval = -0b011_00110`, lineError(1, errParse), &testStruct{}},
 		// overflow
 		{
 			data:   `intval = 9223372036854775808`,
