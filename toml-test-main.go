@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/naoina/toml"
@@ -35,7 +36,7 @@ func toValue(iv interface{}) *value {
 	case int64:
 		return &value{prim: &prim{fmt.Sprint(gv), "integer"}}
 	case float64:
-		return &value{prim: &prim{fmt.Sprint(gv), "float"}}
+		return &value{prim: &prim{strings.ToLower(fmt.Sprint(gv)), "float"}}
 	case string:
 		return &value{prim: &prim{fmt.Sprint(gv), "string"}}
 	case time.Time:
