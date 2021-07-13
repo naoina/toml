@@ -1082,6 +1082,7 @@ func TestUnmarshal_WithUnmarshaler(t *testing.T) {
 		Servers       testUnmarshalerString
 		Table         testUnmarshalerString
 		Arraytable    testUnmarshalerString
+		InlineTable   testUnmarshalerString
 		ArrayOfStruct []testUnmarshalerStruct
 	}
 	data := loadTestData("unmarshal-unmarshaler.toml")
@@ -1091,21 +1092,20 @@ func TestUnmarshal_WithUnmarshaler(t *testing.T) {
 	}
 	actual := v
 	expect := testStruct{
-		Title:      `Unmarshaled: "testtitle"`,
-		MaxConn:    `Unmarshaled: 777`,
-		Ports:      `Unmarshaled: [8080, 8081, 8082]`,
-		Servers:    `Unmarshaled: [1, 2, 3]`,
-		Table:      "Unmarshaled: [table]\nname = \"alice\"",
-		Arraytable: "Unmarshaled: [[arraytable]]\nname = \"alice\"\n[[arraytable]]\nname = \"bob\"",
-		ArrayOfStruct: []testUnmarshalerStruct{
-			{
-				Title:  "Unmarshaled: [[array_of_struct]]\ntitle = \"Alice's Adventures in Wonderland\"\nauthor = \"Lewis Carroll\"",
-				Author: "",
-			},
-		},
+		Title:       `Unmarshaled: "testtitle"`,
+		MaxConn:     `Unmarshaled: 777`,
+		Ports:       `Unmarshaled: [8080, 8081, 8082]`,
+		Servers:     `Unmarshaled: [1, 2, 3]`,
+		InlineTable: `Unmarshaled: {name = "alice"}`,
+		Table:       "Unmarshaled: [table]\nname = \"alice\"",
+		Arraytable:  "Unmarshaled: [[arraytable]]\nname = \"alice\"\n[[arraytable]]\nname = \"bob\"",
+		ArrayOfStruct: []testUnmarshalerStruct{{
+			Title:  "Unmarshaled: [[array_of_struct]]\ntitle = \"Alice's Adventures in Wonderland\"\nauthor = \"Lewis Carroll\"",
+			Author: "",
+		}},
 	}
 	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf(`toml.Unmarshal(data, &v); v => %#v; want %#v`, actual, expect)
+		t.Error("diff:", pretty.Compare(actual, expect))
 	}
 }
 

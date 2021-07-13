@@ -308,8 +308,8 @@ func (p *toml) lookupTable(t *ast.Table, keys []string) (*ast.Table, error) {
 	return t, nil
 }
 
-// SetTableString assigns the source data of a complete table.
-func (p *tomlParser) SetTableString(begin, end int) {
+// SetTableSource assigns the source data of a complete table.
+func (p *tomlParser) SetTableSource(begin, end int) {
 	p.curTable.Data = p.buffer[begin:end]
 	p.curTable.Position.Begin = begin
 	p.curTable.Position.End = end
@@ -389,4 +389,14 @@ func (p *toml) EndInlineTable() {
 	st := p.tabStack[len(p.tabStack)-1]
 	p.key, p.curTable = st.key, st.table
 	p.tabStack = p.tabStack[:len(p.tabStack)-1]
+}
+
+// SetInlineTableSource sets the source data of an inline table.
+// This is called just after parsing the table value, when the table
+// is still in p.val.
+func (p *tomlParser) SetInlineTableSource(begin, end int) {
+	tbl := p.val.(*ast.Table)
+	tbl.Data = p.buffer[begin:end]
+	tbl.Position.Begin = begin
+	tbl.Position.End = end
 }
