@@ -39,7 +39,7 @@ func Parse(data []byte) (*ast.Table, error) {
 		return nil, err
 	}
 
-	return d.p.toml.table, nil
+	return d.p.toml.topTable, nil
 }
 
 type parseState struct {
@@ -90,36 +90,36 @@ func (e *parseError) Line() int {
 	return e.p.line
 }
 
-type stack struct {
+type tabStackElem struct {
 	key   string
 	table *ast.Table
 }
 
 type array struct {
-	parent  *array
-	child   *array
-	current *ast.Array
-	line    int
+	parent *array
+	child  *array
+	a      *ast.Array
+	line   int
 }
 
 type toml struct {
-	table        *ast.Table // the top-level table
-	line         int        // the current line number
-	currentTable *ast.Table // the current table
-	arr          *array     // the current array
-	s            string     // temporary buffer for string values
-	key          string     // the current table key
-	tableKeys    []string   // accumulator for dotted keys
-	val          ast.Value  // last decoded value
-	stack        []*stack   // table stack (for inline tables)
+	topTable    *ast.Table      // the top-level table
+	line        int             // the current line number
+	curTable    *ast.Table      // the current table
+	curArray    *array          // the current array
+	stringBuf   string          // temporary buffer for string values
+	key         string          // the current table key
+	tableKeyAcc []string        // accumulator for dotted keys
+	val         ast.Value       // last decoded value
+	tabStack    []*tabStackElem // table stack (for inline tables)
 }
 
 func (p *toml) init(data []rune) {
 	p.line = 1
-	p.table = p.newTable(ast.TableTypeNormal, "")
-	p.table.Position.End = len(data) - 1
-	p.table.Data = data[:len(data)-1] // truncate the end_symbol added by PEG parse generator.
-	p.currentTable = p.table
+	p.topTable = p.newTable(ast.TableTypeNormal, "")
+	p.topTable.Position.End = len(data) - 1
+	p.topTable.Data = data[:len(data)-1] // truncate the end_symbol added by PEG parse generator.
+	p.curTable = p.topTable
 }
 
 func (p *toml) Error(err error) {
@@ -166,9 +166,9 @@ func (p *tomlParser) SetString(begin, end int) {
 	p.val = &ast.String{
 		Position: ast.Position{Begin: begin, End: end},
 		Data:     p.buffer[begin:end],
-		Value:    p.s,
+		Value:    p.stringBuf,
 	}
-	p.s = ""
+	p.stringBuf = ""
 }
 
 func (p *tomlParser) SetBool(begin, end int) {
@@ -184,27 +184,27 @@ func (p *tomlParser) SetBool(begin, end int) {
 // These run during string parsing and build up the string in p.s.
 
 func (p *toml) SetBasicString(buf []rune, begin, end int) {
-	p.s = p.unquote(string(buf[begin:end]))
+	p.stringBuf = p.unquote(string(buf[begin:end]))
 }
 
 func (p *toml) SetMultilineBasicString() {
-	p.s = p.unquote(`"` + escapeReplacer.Replace(strings.TrimLeft(p.s, "\r\n")) + `"`)
+	p.stringBuf = p.unquote(`"` + escapeReplacer.Replace(strings.TrimLeft(p.stringBuf, "\r\n")) + `"`)
 }
 
 func (p *toml) AddMultilineBasicBody(buf []rune, begin, end int) {
-	p.s += string(buf[begin:end])
+	p.stringBuf += string(buf[begin:end])
 }
 
 func (p *toml) AddMultilineBasicQuote() {
-	p.s += "\\\""
+	p.stringBuf += "\\\""
 }
 
 func (p *toml) SetLiteralString(buf []rune, begin, end int) {
-	p.s = string(buf[begin:end])
+	p.stringBuf = string(buf[begin:end])
 }
 
 func (p *toml) SetMultilineLiteralString(buf []rune, begin, end int) {
-	p.s = strings.TrimLeft(string(buf[begin:end]), "\r\n")
+	p.stringBuf = strings.TrimLeft(string(buf[begin:end]), "\r\n")
 }
 
 func (p *toml) unquote(s string) string {
@@ -220,34 +220,34 @@ func (p *toml) unquote(s string) string {
 // These callbacks maintain the array stack and accumulate elements.
 
 func (p *toml) StartArray() {
-	if p.arr == nil {
-		p.arr = &array{line: p.line, current: &ast.Array{}}
+	if p.curArray == nil {
+		p.curArray = &array{line: p.line, a: &ast.Array{}}
 		return
 	}
-	p.arr.child = &array{parent: p.arr, line: p.line, current: &ast.Array{}}
-	p.arr = p.arr.child
+	p.curArray.child = &array{parent: p.curArray, line: p.line, a: &ast.Array{}}
+	p.curArray = p.curArray.child
 }
 
 func (p *toml) AddArrayVal() {
-	if p.arr.current == nil {
-		p.arr.current = &ast.Array{}
+	if p.curArray.a == nil {
+		p.curArray.a = &ast.Array{}
 	}
-	p.arr.current.Value = append(p.arr.current.Value, p.val)
+	p.curArray.a.Value = append(p.curArray.a.Value, p.val)
 }
 
 func (p *tomlParser) SetArray(begin, end int) {
-	p.arr.current.Position = ast.Position{Begin: begin, End: end}
-	p.arr.current.Data = p.buffer[begin:end]
-	p.val = p.arr.current
-	p.arr = p.arr.parent
+	p.curArray.a.Position = ast.Position{Begin: begin, End: end}
+	p.curArray.a.Data = p.buffer[begin:end]
+	p.val = p.curArray.a
+	p.curArray = p.curArray.parent
 }
 
 // -- Table Callbacks --
 
 func (p *toml) SetTable(buf []rune, begin, end int) {
 	rawName := string(buf[begin:end])
-	p.setTable(p.table, rawName, p.tableKeys)
-	p.tableKeys = nil
+	p.setTable(p.topTable, rawName, p.tableKeyAcc)
+	p.tableKeyAcc = nil
 }
 
 func (p *toml) setTable(parent *ast.Table, name string, names []string) {
@@ -276,7 +276,7 @@ func (p *toml) setTable(parent *ast.Table, name string, names []string) {
 	default:
 		p.Error(fmt.Errorf("BUG: table `%s' is in conflict but it's unknown type `%T'", last, v))
 	}
-	p.currentTable = tbl
+	p.curTable = tbl
 }
 
 func (p *toml) newTable(typ ast.TableType, name string) *ast.Table {
@@ -313,13 +313,13 @@ func (p *toml) lookupTable(t *ast.Table, keys []string) (*ast.Table, error) {
 
 // SetTableString assigns the source data of a complete table.
 func (p *tomlParser) SetTableString(begin, end int) {
-	p.currentTable.Data = p.buffer[begin:end]
-	p.currentTable.Position.Begin = begin
-	p.currentTable.Position.End = end
+	p.curTable.Data = p.buffer[begin:end]
+	p.curTable.Position.Begin = begin
+	p.curTable.Position.End = end
 }
 
 func (p *toml) AddTableKey() {
-	p.tableKeys = append(p.tableKeys, p.key)
+	p.tableKeyAcc = append(p.tableKeyAcc, p.key)
 }
 
 // SetKey is called after a table key has been parsed.
@@ -332,7 +332,7 @@ func (p *toml) SetKey(buf []rune, begin, end int) {
 
 // AddKeyValue is called after a complete key/value pair has been parsed.
 func (p *toml) AddKeyValue() {
-	if val, exists := p.currentTable.Fields[p.key]; exists {
+	if val, exists := p.curTable.Fields[p.key]; exists {
 		switch v := val.(type) {
 		case []*ast.Table:
 			p.Error(fmt.Errorf("key `%s' is in conflict with array table in line %d", p.key, v[0].Line))
@@ -344,15 +344,15 @@ func (p *toml) AddKeyValue() {
 			p.Error(fmt.Errorf("BUG: key `%s' is in conflict but it's unknown type `%T'", p.key, v))
 		}
 	}
-	p.currentTable.Fields[p.key] = &ast.KeyValue{Key: p.key, Value: p.val, Line: p.line}
+	p.curTable.Fields[p.key] = &ast.KeyValue{Key: p.key, Value: p.val, Line: p.line}
 }
 
 // -- Array Table Callbacks --
 
 func (p *toml) SetArrayTable(buf []rune, begin, end int) {
 	rawName := string(buf[begin:end])
-	p.setArrayTable(p.table, rawName, p.tableKeys)
-	p.tableKeys = nil
+	p.setArrayTable(p.topTable, rawName, p.tableKeyAcc)
+	p.tableKeyAcc = nil
 }
 
 func (p *toml) setArrayTable(parent *ast.Table, name string, names []string) {
@@ -374,22 +374,22 @@ func (p *toml) setArrayTable(parent *ast.Table, name string, names []string) {
 	default:
 		p.Error(fmt.Errorf("BUG: array table `%s' is in conflict but it's unknown type `%T'", name, v))
 	}
-	p.currentTable = tbl
+	p.curTable = tbl
 }
 
 // -- Inline Table Callbacks --
 
 func (p *toml) StartInlineTable() {
 	tbl := p.newTable(ast.TableTypeInline, "")
-	p.stack = append(p.stack, &stack{p.key, p.currentTable})
-	p.currentTable = tbl
+	p.tabStack = append(p.tabStack, &tabStackElem{p.key, p.curTable})
+	p.curTable = tbl
 }
 
 func (p *toml) EndInlineTable() {
-	p.val = p.currentTable
+	p.val = p.curTable
 
 	// Restore parent table from stack.
-	st := p.stack[len(p.stack)-1]
-	p.key, p.currentTable = st.key, st.table
-	p.stack = p.stack[:len(p.stack)-1]
+	st := p.tabStack[len(p.tabStack)-1]
+	p.key, p.curTable = st.key, st.table
+	p.tabStack = p.tabStack[:len(p.tabStack)-1]
 }
