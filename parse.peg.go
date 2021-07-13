@@ -66,6 +66,10 @@ const (
 	rulemlLiteralString
 	rulemlLiteralBody
 	rulemlLiteralChar
+	ruledatetime
+	rulepartialTime
+	rulefullDate
+	rulefullTime
 	ruledateFullYear
 	ruledateMonth
 	ruledateMDay
@@ -75,10 +79,6 @@ const (
 	ruletimeSecfrac
 	ruletimeNumoffset
 	ruletimeOffset
-	rulepartialTime
-	rulefullDate
-	rulefullTime
-	ruledatetime
 	ruledigitDual
 	ruledigitQuad
 	rulearray
@@ -164,6 +164,10 @@ var rul3s = [...]string{
 	"mlLiteralString",
 	"mlLiteralBody",
 	"mlLiteralChar",
+	"datetime",
+	"partialTime",
+	"fullDate",
+	"fullTime",
 	"dateFullYear",
 	"dateMonth",
 	"dateMDay",
@@ -173,10 +177,6 @@ var rul3s = [...]string{
 	"timeSecfrac",
 	"timeNumoffset",
 	"timeOffset",
-	"partialTime",
-	"fullDate",
-	"fullTime",
-	"datetime",
 	"digitDual",
 	"digitQuad",
 	"array",
@@ -2672,116 +2672,116 @@ func (p *tomlParser) Init(options ...func(*tomlParser) error) error {
 		nil,
 		/* 47 mlLiteralChar <- <('\t' / [ -\U0010ffff])> */
 		nil,
-		/* 48 dateFullYear <- <digitQuad> */
+		/* 48 datetime <- <((fullDate (((&(' ') ' ') | (&('t') 't') | (&('T') 'T')) fullTime)?) / partialTime)> */
 		nil,
-		/* 49 dateMonth <- <digitDual> */
-		nil,
-		/* 50 dateMDay <- <digitDual> */
-		nil,
-		/* 51 timeHour <- <digitDual> */
+		/* 49 partialTime <- <(timeHour ':' timeMinute ':' timeSecond timeSecfrac?)> */
 		func() bool {
-			position316, tokenIndex316 := position, tokenIndex
+			position314, tokenIndex314 := position, tokenIndex
 			{
-				position317 := position
-				if !_rules[ruledigitDual]() {
-					goto l316
-				}
-				add(ruletimeHour, position317)
-			}
-			return true
-		l316:
-			position, tokenIndex = position316, tokenIndex316
-			return false
-		},
-		/* 52 timeMinute <- <digitDual> */
-		func() bool {
-			position318, tokenIndex318 := position, tokenIndex
-			{
-				position319 := position
-				if !_rules[ruledigitDual]() {
-					goto l318
-				}
-				add(ruletimeMinute, position319)
-			}
-			return true
-		l318:
-			position, tokenIndex = position318, tokenIndex318
-			return false
-		},
-		/* 53 timeSecond <- <digitDual> */
-		nil,
-		/* 54 timeSecfrac <- <('.' decimalDigit+)> */
-		nil,
-		/* 55 timeNumoffset <- <(('-' / '+') timeHour ':' timeMinute)> */
-		nil,
-		/* 56 timeOffset <- <((&('z') 'z') | (&('Z') 'Z') | (&('+' | '-') timeNumoffset))> */
-		nil,
-		/* 57 partialTime <- <(timeHour ':' timeMinute ':' timeSecond timeSecfrac?)> */
-		func() bool {
-			position324, tokenIndex324 := position, tokenIndex
-			{
-				position325 := position
+				position315 := position
 				if !_rules[ruletimeHour]() {
-					goto l324
+					goto l314
 				}
 				if buffer[position] != rune(':') {
-					goto l324
+					goto l314
 				}
 				position++
 				if !_rules[ruletimeMinute]() {
-					goto l324
+					goto l314
 				}
 				if buffer[position] != rune(':') {
-					goto l324
+					goto l314
 				}
 				position++
 				{
-					position326 := position
+					position316 := position
 					if !_rules[ruledigitDual]() {
-						goto l324
+						goto l314
 					}
-					add(ruletimeSecond, position326)
+					add(ruletimeSecond, position316)
 				}
 				{
-					position327, tokenIndex327 := position, tokenIndex
+					position317, tokenIndex317 := position, tokenIndex
 					{
-						position329 := position
+						position319 := position
 						if buffer[position] != rune('.') {
-							goto l327
+							goto l317
 						}
 						position++
 						if !_rules[ruledecimalDigit]() {
-							goto l327
+							goto l317
 						}
-					l330:
+					l320:
 						{
-							position331, tokenIndex331 := position, tokenIndex
+							position321, tokenIndex321 := position, tokenIndex
 							if !_rules[ruledecimalDigit]() {
-								goto l331
+								goto l321
 							}
-							goto l330
-						l331:
-							position, tokenIndex = position331, tokenIndex331
+							goto l320
+						l321:
+							position, tokenIndex = position321, tokenIndex321
 						}
-						add(ruletimeSecfrac, position329)
+						add(ruletimeSecfrac, position319)
 					}
-					goto l328
-				l327:
-					position, tokenIndex = position327, tokenIndex327
+					goto l318
+				l317:
+					position, tokenIndex = position317, tokenIndex317
 				}
-			l328:
-				add(rulepartialTime, position325)
+			l318:
+				add(rulepartialTime, position315)
 			}
 			return true
-		l324:
-			position, tokenIndex = position324, tokenIndex324
+		l314:
+			position, tokenIndex = position314, tokenIndex314
 			return false
 		},
-		/* 58 fullDate <- <(dateFullYear '-' dateMonth '-' dateMDay)> */
+		/* 50 fullDate <- <(dateFullYear '-' dateMonth '-' dateMDay)> */
 		nil,
-		/* 59 fullTime <- <(partialTime timeOffset?)> */
+		/* 51 fullTime <- <(partialTime timeOffset?)> */
 		nil,
-		/* 60 datetime <- <((fullDate (((&(' ') ' ') | (&('t') 't') | (&('T') 'T')) fullTime)?) / partialTime)> */
+		/* 52 dateFullYear <- <digitQuad> */
+		nil,
+		/* 53 dateMonth <- <digitDual> */
+		nil,
+		/* 54 dateMDay <- <digitDual> */
+		nil,
+		/* 55 timeHour <- <digitDual> */
+		func() bool {
+			position327, tokenIndex327 := position, tokenIndex
+			{
+				position328 := position
+				if !_rules[ruledigitDual]() {
+					goto l327
+				}
+				add(ruletimeHour, position328)
+			}
+			return true
+		l327:
+			position, tokenIndex = position327, tokenIndex327
+			return false
+		},
+		/* 56 timeMinute <- <digitDual> */
+		func() bool {
+			position329, tokenIndex329 := position, tokenIndex
+			{
+				position330 := position
+				if !_rules[ruledigitDual]() {
+					goto l329
+				}
+				add(ruletimeMinute, position330)
+			}
+			return true
+		l329:
+			position, tokenIndex = position329, tokenIndex329
+			return false
+		},
+		/* 57 timeSecond <- <digitDual> */
+		nil,
+		/* 58 timeSecfrac <- <('.' decimalDigit+)> */
+		nil,
+		/* 59 timeNumoffset <- <(('-' / '+') timeHour ':' timeMinute)> */
+		nil,
+		/* 60 timeOffset <- <((&('z') 'z') | (&('Z') 'Z') | (&('+' | '-') timeNumoffset))> */
 		nil,
 		/* 61 digitDual <- <(decimalDigit decimalDigit)> */
 		func() bool {

@@ -137,6 +137,13 @@ mlLiteralChar <- [\t -\0x10FFFF]
 # -------------------------------------------------------------------------
 # -- Datetimes
 
+datetime <- (fullDate ([Tt ] fullTime)?) / partialTime
+
+partialTime <- timeHour ':' timeMinute ':' timeSecond timeSecfrac?
+
+fullDate <- dateFullYear '-' dateMonth '-' dateMDay
+fullTime <- partialTime timeOffset?
+
 dateFullYear <- digitQuad
 dateMonth <- digitDual
 dateMDay <- digitDual
@@ -146,10 +153,6 @@ timeSecond <- digitDual
 timeSecfrac <- '.' decimalDigit+
 timeNumoffset <- [\-+] timeHour ':' timeMinute
 timeOffset <- [Zz] / timeNumoffset
-partialTime <- timeHour ':' timeMinute ':' timeSecond timeSecfrac?
-fullDate <- dateFullYear '-' dateMonth '-' dateMDay
-fullTime <- partialTime timeOffset?
-datetime <- (fullDate ([Tt ] fullTime)?) / partialTime
 
 digitDual <- decimalDigit decimalDigit
 digitQuad <- digitDual digitDual
@@ -172,8 +175,8 @@ arrayValues <- (
         (wsnl comment)* wsnl
         val { p.AddArrayVal() }
     )*
-    (wsnl comment)*
-    wsnl arraySep?
+    (wsnl comment)* wsnl
+    arraySep?
     (wsnl comment)*
 )
 
