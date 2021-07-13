@@ -1,3 +1,6 @@
+# unmarshal-string-5.toml
+# This checks that quotes are valid in multiline strings.
+
 key1 = """I dare to say "this is valid TOML", and I'm not joking"""
 key2 = '''I dare to say 'this is valid TOML', and I'm not joking'''
 key3 = """I dare to say 'this is valid TOML', and I'm not joking"""

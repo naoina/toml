@@ -116,7 +116,7 @@ basicString <- <'"' basicChar* '"'> { p.SetBasicString(p.buffer, begin, end) }
 basicChar <- basicUnescaped / escaped
 
 # This is basically the full printable range, excluding " and \
-basicUnescaped <- [ -!#-\[\]-\0x10FFFF]
+basicUnescaped <- [\t -!#-\[\]-\0x10FFFF]
 
 mlBasicString <- '"""' mlBasicBody '"""' { p.SetMultilineBasicString() }
 

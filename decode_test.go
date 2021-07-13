@@ -381,6 +381,13 @@ func TestUnmarshal_WithString(t *testing.T) {
 				Key3: `I dare to say 'this is valid TOML', and I'm not joking`,
 			},
 		},
+		{
+			data: string(loadTestData("unmarshal-string-6.toml")),
+			expect: &testStruct{
+				Key1: "\t<tab",
+				Key2: "\t<tab",
+			},
+		},
 	})
 }
 
