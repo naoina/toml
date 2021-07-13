@@ -8,7 +8,7 @@
 #
 # Or encoder tests:
 #
-#   ./toml-test.sh -encoder   # runs encoder tests
+#   ./toml-test.sh -encoder
 #
 # Or a specific encoder test:
 #
@@ -41,7 +41,7 @@ version=2349618fe2bcc4393461c6c7d37b417c05e1b181
 env "GOBIN=$PWD" go install "github.com/BurntSushi/toml-test/cmd/toml-test@$version"
 
 # Build test adapter.
-go build -o toml-test-adapter toml-test-main.go
+go build -o toml-test-adapter toml-test-adapter.go
 
 # Run the tests.
 ./toml-test $args -- ./toml-test-adapter $testargs
