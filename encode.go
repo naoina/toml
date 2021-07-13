@@ -279,29 +279,43 @@ func (b *tableBuf) field(cfg *Config, name string, rv reflect.Value) ([]*tableBu
 
 // value writes a plain value.
 func (b *tableBuf) value(cfg *Config, rv reflect.Value, name string) ([]*tableBuf, error) {
-	isMarshaler, newtables, err := b.marshaler(cfg, rv, name)
+	isMarshaler, tables, err := b.marshaler(cfg, rv, name)
 	if isMarshaler {
-		return newtables, err
+		return tables, err
 	}
-	switch rv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+
+	k := rv.Kind()
+	switch {
+	case k >= reflect.Int && k <= reflect.Int64:
 		b.body = strconv.AppendInt(b.body, rv.Int(), 10)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return nil, nil
+
+	case k >= reflect.Uint && k <= reflect.Uintptr:
 		b.body = strconv.AppendUint(b.body, rv.Uint(), 10)
-	case reflect.Float32, reflect.Float64:
+		return nil, nil
+
+	case k >= reflect.Float32 && k <= reflect.Float64:
 		b.body = appendFloat(b.body, rv.Float())
-	case reflect.Bool:
+		return nil, nil
+
+	case k == reflect.Bool:
 		b.body = strconv.AppendBool(b.body, rv.Bool())
-	case reflect.String:
+		return nil, nil
+
+	case k == reflect.String:
 		b.body = strconv.AppendQuote(b.body, rv.String())
-	case reflect.Ptr, reflect.Interface:
+		return nil, nil
+
+	case k == reflect.Ptr || k == reflect.Interface:
 		if rv.IsNil() {
 			return nil, &marshalNilError{rv.Type()}
 		}
 		return b.value(cfg, rv.Elem(), name)
-	case reflect.Slice, reflect.Array:
+
+	case k == reflect.Slice || k == reflect.Array:
 		return b.array(cfg, rv, name)
-	case reflect.Struct:
+
+	case k == reflect.Struct:
 		child := b.newChild(name)
 		tables, err := child.structFields(cfg, rv)
 		b.addChild(child)
@@ -310,7 +324,8 @@ func (b *tableBuf) value(cfg *Config, rv reflect.Value, name string) ([]*tableBu
 		}
 		tables = append(tables, child)
 		return tables, err
-	case reflect.Map:
+
+	case k == reflect.Map:
 		child := b.newChild(name)
 		tables, err := child.mapFields(cfg, rv)
 		b.addChild(child)
@@ -319,10 +334,10 @@ func (b *tableBuf) value(cfg *Config, rv reflect.Value, name string) ([]*tableBu
 		}
 		tables = append(tables, child)
 		return tables, err
+
 	default:
 		return nil, fmt.Errorf("toml: marshal: unsupported type %v", rv.Kind())
 	}
-	return nil, nil
 }
 
 func (b *tableBuf) array(cfg *Config, rv reflect.Value, name string) ([]*tableBuf, error) {
