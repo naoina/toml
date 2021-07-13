@@ -34,6 +34,14 @@ type Config struct {
 	// MissingField, if non-nil, is called when the decoder encounters a key for which no
 	// matching struct field exists. The default behavior is to return an error.
 	MissingField func(typ reflect.Type, key string) error
+
+	// WriteEmptyTables instructs the encoder to write all tables, even if they are empty.
+	// By default, empty tables are not written to the output. Note that empty array
+	// tables and inline tables are always written.
+	//
+	// This setting mostly exists for compatibility with the toml-test tool.
+	// Don't set this unless you have a good reason for it.
+	WriteEmptyTables bool
 }
 
 // DefaultConfig contains the default options for encoding and decoding.

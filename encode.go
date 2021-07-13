@@ -169,7 +169,7 @@ func (b *tableBuf) newChild(name string) *tableBuf {
 // addChild adds a child table to b.
 // This is called after all values in child have already been
 // written to child.body.
-func (b *tableBuf) addChild(child *tableBuf) {
+func (b *tableBuf) addChild(cfg *Config, child *tableBuf) {
 	// Inline tables are not tracked in b.children.
 	if child.typ == ast.TableTypeInline {
 		b.body = append(b.body, child.body...)
@@ -180,10 +180,10 @@ func (b *tableBuf) addChild(child *tableBuf) {
 	// Empty table elision: we can avoid writing a table that doesn't have any keys on its
 	// own. Array tables can't be elided because they define array elements (which would
 	// be missing if elided).
-	if len(child.body) == 0 && child.typ == ast.TableTypeNormal {
+	if len(child.body) == 0 && child.typ == ast.TableTypeNormal && !cfg.WriteEmptyTables {
 		for _, gchild := range child.children {
 			gchild.name = child.name + "." + gchild.name
-			b.addChild(gchild)
+			b.addChild(cfg, gchild)
 		}
 		return
 	}
@@ -318,7 +318,7 @@ func (b *tableBuf) value(cfg *Config, rv reflect.Value, name string) ([]*tableBu
 	case k == reflect.Struct:
 		child := b.newChild(name)
 		tables, err := child.structFields(cfg, rv)
-		b.addChild(child)
+		b.addChild(cfg, child)
 		if child.typ == ast.TableTypeInline {
 			return nil, err
 		}
@@ -328,7 +328,7 @@ func (b *tableBuf) value(cfg *Config, rv reflect.Value, name string) ([]*tableBu
 	case k == reflect.Map:
 		child := b.newChild(name)
 		tables, err := child.mapFields(cfg, rv)
-		b.addChild(child)
+		b.addChild(cfg, child)
 		if child.typ == ast.TableTypeInline {
 			return nil, err
 		}
