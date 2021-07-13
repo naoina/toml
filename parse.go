@@ -16,7 +16,10 @@ import (
 
 //go:generate peg -switch -inline parse.peg
 
-var errParse = errors.New("invalid TOML syntax")
+var (
+	errParse           = errors.New("invalid TOML syntax")
+	errNewlineRequired = errors.New("newline required in table")
+)
 
 var (
 	underscoreReplacer = strings.NewReplacer("_", "")
@@ -56,6 +59,7 @@ func (d *parseState) parse() error {
 	if err := d.p.Parse(); err != nil {
 		if err, ok := err.(*parseError); ok {
 			return lineError(err.Line(), errParse)
+			// return lineError(err.Line(), errors.New("parse error:\n"+d.p.SprintSyntaxTree()))
 		}
 		return err
 	}
