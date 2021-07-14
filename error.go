@@ -1,14 +1,9 @@
 package toml
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
-)
-
-var (
-	errArrayMultiType = errors.New("array can't contain multiple types")
 )
 
 // LineError is returned by Unmarshal, UnmarshalTable and Parse

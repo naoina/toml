@@ -498,7 +498,7 @@ func TestUnmarshal_WithFloat(t *testing.T) {
 		{`floatval = -inf`, nil, &testStruct{math.Inf(-1)}},
 		{`floatval = 0.0`, nil, &testStruct{0.0}},
 		{`floatval = +0.0`, nil, &testStruct{0.0}},
-		{`floatval = -0.0`, nil, &testStruct{-0.0}},
+		{`floatval = -0.0`, nil, &testStruct{0.0}},
 		{`floatval = 0.1`, nil, &testStruct{0.1}},
 		{`floatval = +0.1`, nil, &testStruct{0.1}},
 		{`floatval = -0.1`, nil, &testStruct{-0.1}},

@@ -15,10 +15,6 @@ import (
 	"github.com/naoina/toml/ast"
 )
 
-const (
-	tableSeparator = '.'
-)
-
 var timeType = reflect.TypeOf(time.Time{})
 
 // Unmarshal parses the TOML data and stores the result in the value pointed to by v.
@@ -114,14 +110,14 @@ func unmarshalTableOrValue(cfg *Config, rv reflect.Value, av interface{}) error 
 	}
 	rv = indirect(rv)
 
-	switch av.(type) {
+	switch av := av.(type) {
 	case *ast.KeyValue, *ast.Table, []*ast.Table:
 		if err := unmarshalField(cfg, rv, av); err != nil {
 			return lineError(fieldLineNumber(av), err)
 		}
 		return nil
 	case ast.Value:
-		return setValue(cfg, rv, av.(ast.Value))
+		return setValue(cfg, rv, av)
 	default:
 		panic(fmt.Sprintf("BUG: unhandled AST node type %T", av))
 	}
@@ -133,9 +129,10 @@ func unmarshalTableOrValue(cfg *Config, rv reflect.Value, av interface{}) error 
 // (special) case, the map is used as-is instead of creating a new map.
 func unmarshalTable(cfg *Config, rv reflect.Value, t *ast.Table, toplevelMap bool) error {
 	rv = indirect(rv)
-	if err, ok := setUnmarshaler(cfg, rv, t); ok {
+	if handled, err := setUnmarshaler(cfg, rv, t); handled {
 		return lineError(t.Line, err)
 	}
+
 	switch {
 	case rv.Kind() == reflect.Struct:
 		fc := makeFieldCache(cfg, rv.Type())
@@ -203,7 +200,7 @@ func unmarshalField(cfg *Config, rv reflect.Value, fieldAst interface{}) error {
 		return unmarshalTable(cfg, rv, av, false)
 	case []*ast.Table:
 		rv = indirect(rv)
-		if err, ok := setUnmarshaler(cfg, rv, fieldAst); ok {
+		if handled, err := setUnmarshaler(cfg, rv, fieldAst); handled {
 			return err
 		}
 		var slice reflect.Value
@@ -257,10 +254,10 @@ func unmarshalMapKey(typ reflect.Type, key string) (reflect.Value, error) {
 
 func setValue(cfg *Config, lhs reflect.Value, val ast.Value) error {
 	lhs = indirect(lhs)
-	if err, ok := setUnmarshaler(cfg, lhs, val); ok {
+	if handled, err := setUnmarshaler(cfg, lhs, val); handled {
 		return err
 	}
-	if err, ok := setTextUnmarshaler(lhs, val); ok {
+	if handled, err := setTextUnmarshaler(lhs, val); handled {
 		return err
 	}
 	switch v := val.(type) {
@@ -293,19 +290,19 @@ func indirect(rv reflect.Value) reflect.Value {
 	return rv
 }
 
-func setUnmarshaler(cfg *Config, lhs reflect.Value, av interface{}) (error, bool) {
+func setUnmarshaler(cfg *Config, lhs reflect.Value, av interface{}) (bool, error) {
 	if lhs.CanAddr() {
 		if u, ok := lhs.Addr().Interface().(UnmarshalerRec); ok {
 			err := u.UnmarshalTOML(func(v interface{}) error {
 				return unmarshalTableOrValue(cfg, reflect.ValueOf(v), av)
 			})
-			return err, true
+			return true, err
 		}
 		if u, ok := lhs.Addr().Interface().(Unmarshaler); ok {
-			return u.UnmarshalTOML(unmarshalerSource(av)), true
+			return true, u.UnmarshalTOML(unmarshalerSource(av))
 		}
 	}
-	return nil, false
+	return false, nil
 }
 
 func unmarshalerSource(av interface{}) []byte {
@@ -326,18 +323,20 @@ func unmarshalerSource(av interface{}) []byte {
 	return source
 }
 
-func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
+func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (bool, error) {
 	if !lhs.CanAddr() {
-		return nil, false
+		return false, nil
 	}
 	u, ok := lhs.Addr().Interface().(encoding.TextUnmarshaler)
 	if !ok || lhs.Type() == timeType {
-		return nil, false
+		return false, nil
 	}
 	var data string
 	switch val := val.(type) {
 	case *ast.Array:
-		return &unmarshalTypeError{"array", "", lhs.Type()}, true
+		return true, &unmarshalTypeError{"array", "", lhs.Type()}
+	case *ast.Table:
+		return true, &unmarshalTypeError{"table", "", lhs.Type()}
 	case *ast.String:
 		data = val.Value
 	case *ast.Integer:
@@ -347,7 +346,7 @@ func setTextUnmarshaler(lhs reflect.Value, val ast.Value) (error, bool) {
 	default:
 		data = val.Source()
 	}
-	return u.UnmarshalText([]byte(data)), true
+	return true, u.UnmarshalText([]byte(data))
 }
 
 func setInt(fv reflect.Value, v *ast.Integer) error {

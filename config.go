@@ -1,7 +1,6 @@
 package toml
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -57,10 +56,6 @@ func defaultNormFieldName(typ reflect.Type, s string) string {
 
 func snakeCase(typ reflect.Type, s string) string {
 	return stringutil.ToSnakeCase(s)
-}
-
-func defaultMissingField(typ reflect.Type, key string) error {
-	return fmt.Errorf("field corresponding to `%s' is not defined in %v", key, typ)
 }
 
 // NewEncoder returns a new Encoder that writes to w.
