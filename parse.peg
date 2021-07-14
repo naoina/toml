@@ -140,20 +140,37 @@ basicUnescaped <- [\t -!#-\[\]-\0x10FFFF]
 mlBasicString <- '"""' mlBasicBody '"""' { p.SetMultilineBasicString() }
 
 mlBasicBody <- (
+    mlBasicBodyChar*
+    mlBasicBodyEndQuotes?                # needed for strings like """str"""""
+)
+
+mlBasicBodyChar <- (
     !'"""' '"' { p.AddMultilineBasicQuote() }
   / <basicChar / newline> { p.AddMultilineBasicBody(p.buffer, begin, end) }
   / escape newline wsnl
-)*
+)
+mlBasicBodyEndQuotes <- (
+    ('""' &'"""') { p.AddMultilineBasicQuote(); p.AddMultilineBasicQuote() }
+  / ('"' &'"""')  { p.AddMultilineBasicQuote() }
+)
 
 literalString <- "'" <literalChar*> "'" { p.SetLiteralString(p.buffer, begin, end) }
 
 literalChar <- [\t -&(-\0x10FFFF]
 
-mlLiteralString <- "'''" <mlLiteralBody> "'''" { p.SetMultilineLiteralString(p.buffer, begin, end) }
+mlLiteralString <- (
+    "'''"
+    <mlLiteralBody> { p.SetMultilineLiteralString(p.buffer, begin, end) }
+    "'''"
+)
 
-mlLiteralBody <- (!"'''" (mlLiteralChar / newline))*
+mlLiteralBody <- (
+    (!"'''" (mlLiteralChar / newline))*
+    mlLiteralBodyEndQuotes?               # needed for '''str'''''
+)
 
 mlLiteralChar <- [\t -\0x10FFFF]
+mlLiteralBodyEndQuotes <- ("''" &"'''") / ("'" &"'''")
 
 # -------------------------------------------------------------------------
 # -- Datetimes
