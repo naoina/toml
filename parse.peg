@@ -13,17 +13,6 @@ Expression <- (
   / ws
 )
 
-newline <- ('\r\n' / '\n') { p.Newline() }
-
-newlineRequired <- (
-    !newline { p.Error(errNewlineRequired) }
-  / newline
-)
-
-ws <- [ \t]*
-wsnl <- ([ \t] / newline)*
-comment <- '#' [\t -\0x10FFFF]*
-
 val <- (
     <datetime>    { p.SetTime(begin, end) }
   / <float>       { p.SetFloat(begin, end) }
@@ -33,6 +22,22 @@ val <- (
   / <array>       { p.SetArray(begin, end) }
   / <inlineTable> { p.SetInlineTableSource(begin, end) }
 )
+
+ws <- [ \t]*
+wsnl <- ([ \t] / newline)*
+
+comment <- '#' (badControl / [\t -\0x10FFFF])*
+
+newline <- ('\r\n' / '\n') { p.Newline() }
+
+newlineRequired <- (
+    !newline { p.Error(errNewlineRequired) }
+  / newline
+)
+
+badControl <- <[\0x7F\0x0B\0xC\0x00-\0x08\0x0E-\0x1F]> {
+    p.Error(&rawControlError{p.buffer[begin]})
+}
 
 # -------------------------------------------------------------------------
 # -- Tables
@@ -47,7 +52,9 @@ keyval <- key ws '=' ws val { p.AddKeyValue() }
 
 key <- bareKey / quotedKey
 
-bareKey <- <[0-9A-Za-z\-_]+> { p.SetKey(p.buffer, begin, end) }
+bareKey <- <bareKeyChar+> { p.SetKey(p.buffer, begin, end) }
+
+bareKeyChar <- badControl / [0-9A-Za-z\-_]
 
 quotedKey <- < '"' basicChar* '"' > { p.SetKey(p.buffer, begin, end) }
 
@@ -132,7 +139,7 @@ string <- (
 
 basicString <- <'"' basicChar* '"'> { p.SetBasicString(p.buffer, begin, end) }
 
-basicChar <- basicUnescaped / escaped
+basicChar <- badControl / basicUnescaped / escaped
 
 # This is basically the full printable range, excluding " and \
 basicUnescaped <- [\t -!#-\[\]-\0x10FFFF]
@@ -156,7 +163,7 @@ mlBasicBodyEndQuotes <- (
 
 literalString <- "'" <literalChar*> "'" { p.SetLiteralString(p.buffer, begin, end) }
 
-literalChar <- [\t -&(-\0x10FFFF]
+literalChar <- badControl / [\t -&(-\0x10FFFF]
 
 mlLiteralString <- (
     "'''"
@@ -169,7 +176,7 @@ mlLiteralBody <- (
     mlLiteralBodyEndQuotes?               # needed for '''str'''''
 )
 
-mlLiteralChar <- [\t -\0x10FFFF]
+mlLiteralChar <- badControl / [\t -\0x10FFFF]
 mlLiteralBodyEndQuotes <- ("''" &"'''") / ("'" &"'''")
 
 # -------------------------------------------------------------------------

@@ -41,6 +41,14 @@ func lineErrorField(line int, field string, err error) error {
 	return err
 }
 
+type rawControlError struct {
+	char rune
+}
+
+func (err *rawControlError) Error() string {
+	return fmt.Sprintf("raw control character %q", err.char)
+}
+
 type overflowError struct {
 	kind reflect.Kind
 	v    string
