@@ -43,14 +43,6 @@ stdTable <- '[' ws <tableKey> ws ']' { p.SetTable(p.buffer, begin, end) }
 
 arrayTable <- '[[' ws <tableKey> ws ']]' { p.SetArrayTable(p.buffer, begin, end) }
 
-inlineTable <- (
-    '{' { p.StartInlineTable() }
-    ws inlineTableKeyValues ws
-    '}' { p.EndInlineTable() }
-)
-
-inlineTableKeyValues <- (keyval inlineTableValSep?)*
-
 keyval <- key ws '=' ws val { p.AddKeyValue() }
 
 key <- bareKey / quotedKey
@@ -65,7 +57,33 @@ tableKeyComp <- key { p.AddTableKey() }
 
 tableKeySep <- ws '.' ws
 
-inlineTableValSep <- ws ',' ws
+# -------------------------------------------------------------------------
+# -- Inline Tables
+
+inlineTable <- (
+    '{' { p.StartInlineTable() }
+    ws inlineTableKeyValues? ws
+    '}' { p.EndInlineTable() }
+)
+
+inlineTableKeyValues <- (
+  keyval
+  (
+      ws inlineTableCommaRequired ws
+      keyval
+  )*
+  ws inlineTableCommaForbidden
+)
+
+inlineTableCommaForbidden <- (
+    !','
+  / ',' { p.Error(errInlineTableCommaAtEnd) }
+)
+
+inlineTableCommaRequired <- (
+    !',' { p.Error(errInlineTableCommaRequired) }
+  / ','
+)
 
 # -------------------------------------------------------------------------
 # -- Booleans

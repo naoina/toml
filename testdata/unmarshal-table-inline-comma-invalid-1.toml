@@ -1,0 +1,3 @@
+# unmarshal-table-inline-comma-invalid-1.toml
+
+table = {key = "value",}

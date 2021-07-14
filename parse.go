@@ -17,8 +17,10 @@ import (
 //go:generate peg -switch -inline parse.peg
 
 var (
-	errParse           = errors.New("invalid TOML syntax")
-	errNewlineRequired = errors.New("newline required in table")
+	errParse                    = errors.New("invalid TOML syntax")
+	errNewlineRequired          = errors.New("newline required in table")
+	errInlineTableCommaRequired = errors.New("missing ',' in inline table")
+	errInlineTableCommaAtEnd    = errors.New("inline table cannot contain ',' after last key/value pair")
 )
 
 var (
