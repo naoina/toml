@@ -942,12 +942,16 @@ func TestUnmarshal_WithEmbeddedStruct(t *testing.T) {
 	type TestEmbStructA struct {
 		A string
 	}
+	type TestEmbStructATag struct {
+		A string `toml:"a"`
+	}
+
 	testUnmarshal(t, []testcase{
 		{
 			data: `a = "value"`,
 			expect: &struct {
 				TestEmbStructA
-				A string
+				A string `toml:"a"`
 			}{
 				A: "value",
 			},
@@ -955,10 +959,57 @@ func TestUnmarshal_WithEmbeddedStruct(t *testing.T) {
 		{
 			data: `a = "value"`,
 			expect: &struct {
-				A string
+				A string `toml:"a"`
 				TestEmbStructA
 			}{
 				A: "value",
+			},
+		},
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				TestEmbStructA
+				A string
+			}{
+				A: "",
+			},
+			err: lineError(1, fmt.Errorf("field corresponding to `a' in struct { toml.TestEmbStructA; A string } cannot be set through TOML")),
+		},
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				a string
+			}{
+				a: "",
+			},
+			err: lineError(1, fmt.Errorf("field corresponding to `a' in struct { toml.TestEmbStructA; A string } cannot be set through TOML")),
+		},
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				A string `toml:"a"`
+				TestEmbStructATag
+			}{
+				A: "value",
+			},
+			err: lineError(1, fmt.Errorf("field corresponding to `a' in struct { A string \"toml:\\\"a\\\"\"; toml.TestEmbStructATag } cannot be set through TOML")),
+		},
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				A string
+				TestEmbStructATag
+			}{
+				TestEmbStructATag: TestEmbStructATag{A: "value"},
+			},
+		},
+		{
+			data: `a = "value"`,
+			expect: &struct {
+				B string
+				TestEmbStructA
+			}{
+				TestEmbStructA: TestEmbStructA{A: "value"},
 			},
 		},
 	})
