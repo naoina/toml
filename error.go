@@ -22,6 +22,10 @@ func (err *LineError) Error() string {
 	return fmt.Sprintf("line %d: %s%v", err.Line, field, err.Err)
 }
 
+func (err *LineError) Unwrap() error {
+	return err.Err
+}
+
 func lineError(line int, err error) error {
 	if err == nil {
 		return nil
