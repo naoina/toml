@@ -180,7 +180,7 @@ All types that can be used are following:
 * uint16 (from `0` to `65535`)
 * uint32 (from `0` to `4294967295`)
 * uint64 (from `0` to `18446744073709551615`)
-* uint (same as `uint` on 32bit environment, or `uint64` on 64bit environment)
+* uint (same as `uint32` on 32bit environment, or `uint64` on 64bit environment)
 
 ### Float
 
